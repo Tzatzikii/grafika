@@ -3,13 +3,14 @@ cflags=-Wno-write-strings
 
 libs=-lGLEW -lGL -lGLU -lglut
 
+dbgflags=-g
+
 allobjs=framework.o Skeleton.o smoothtriangle.o
 
 framework.o: framework.cpp framework.h
-	g++ -c framework.cpp
-
+	g++ -c ${dbgflags} framework.cpp 
 Skeleton.o: Skeleton.cpp
-	g++ -c Skeleton.cpp
+	g++ -c ${dbgflags} Skeleton.cpp ${cflags}
 
 smoothtriangle.o: smoothtriangle.cpp
 	g++ -c smoothtriangle.cpp
