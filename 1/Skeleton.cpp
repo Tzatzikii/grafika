@@ -95,9 +95,9 @@ class PointCollection{
 	size_t pointCount;
 	
 public:
-	vec3* editPoint;
+	bool createPoints;
 	void create(){
-		editPoint = nullptr;
+		createPoints = false;
 		points.create();
 		pointCount = 0;
 	}
@@ -105,6 +105,7 @@ public:
 		pointCount++;
 		printf("%f, %f\n", pos.x, pos.y);
 		points.getVertices().push_back(pos);
+		points.updateGPU();
 	}
 
 	vec3& findNearest(float mX, float mY){
@@ -154,11 +155,14 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
+	if (key == 'p') {
+		pointCollection.createPoints = true;
+	}
 }
 
 // Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
+
 }
 
 // Move mouse with key pressed
@@ -167,20 +171,16 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 	//printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
-	if(pointCollection.editPoint != nullptr){
-		pointCollection.editPoint->x = cX;
-		pointCollection.editPoint->y = cY;
-	}
 }
 
 
 void onMouse(int button, int state, int pX, int pY) {
 	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
+
+	if(pointCollection.createPoints) pointCollection.addPoint(vec3(cX, cY, 1));
 	
-	if(state == GLUT_DOWN && button == GLUT_LEFT_BUTTON) {
-		pointCollection.addPoint(vec3(cX, cY, 1));
-	}
+
 }
 
 // Idle event indicating that some time elapsed: do animation here
