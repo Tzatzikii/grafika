@@ -108,12 +108,14 @@ public:
 		points.updateGPU();
 	}
 
-	vec3& findNearest(float mX, float mY){
-		vec3& nearest = points.getVertices()[0];
-		float minDist = pyth2d(mX - nearest.x, mY - nearest.y);
+	vec3* findNearest(float mX, float mY){
+		vec3* nearest = &points.getVertices()[0];
+		float minDist = pyth2d(mX - nearest->x, mY - nearest->y);
 
-		for(vec3& vtx : points.getVertices()){
-			if(float tempDist = pyth2d(mX-vtx.x, mY-vtx.y) < minDist){
+		for(int i = 0; i < pointCount; i++){
+			vec3* vtx = &points.getVertices()[i];
+			float tempDist = pyth2d(mX-vtx->x, mY-vtx->y);
+			if(tempDist < minDist){
 				minDist = tempDist;
 				nearest = vtx;
 			}
@@ -125,8 +127,32 @@ public:
 		points.updateGPU();
 		points.draw(GL_POINTS, color);
 	}
-
+	Object getPoints() const {
+		return points;
+	}
 	size_t getCount(){return pointCount; }
+};
+
+class Line{
+	vec3 n;
+	float param;
+public:
+	Line(vec3 a, vec3 b) {
+		n = { a.y - b.y, b.x - a.x, 0 };
+		param = dot(a, n);
+		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
+	}
+
+	vec3 intersect(Line line) const {
+		float f = line.n.x / n.x;
+		float y = (f*param - line.param)/(f*n.y - line.n.y);
+		float x = (param - n.y)/n.x;
+		return vec3(x, y, 1);
+	}
+
+	bool through(const vec3& point) const {
+		return std::abs(dot(point, n) - param) <= 0.01; 
+	}
 };
 
 PointCollection pointCollection;
@@ -153,10 +179,17 @@ void onDisplay() {
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
+enum programModes {
+	createPoints = 0,
+	createLine = 1,
+	moveLine = 2
+};
+int mode = -1;
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == 'p') {
-		pointCollection.createPoints = true;
+	switch(key){
+	case 'p': mode = createPoints; break;
+	case 'l': mode = createLine;
 	}
 }
 
@@ -177,8 +210,37 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 void onMouse(int button, int state, int pX, int pY) {
 	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
+	float pointClickThreshold = 0.02;
+	float lineClickThreshold = 0.01;
 
-	if(pointCollection.createPoints) pointCollection.addPoint(vec3(cX, cY, 1));
+	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+		switch(mode){
+		case createPoints: pointCollection.addPoint(vec3(cX, cY, 1)); break;
+		case createLine: {
+			const static vec3* a,* b;
+			static bool aSel = false;
+			static bool bSel = false;
+
+			const vec3* pt = pointCollection.findNearest(cX, cY);
+			float dist = pyth2d(pt->x - cX, pt->y - cY);
+			if(!aSel && dist < pointClickThreshold) {
+				a = pt;
+				aSel = true;
+				if(aSel) printf("A point selected\n");
+			}else if(!bSel && dist < pointClickThreshold) {
+				b = pt;
+				if(b != a) bSel = true;
+				if(bSel) printf("B point selected\n");
+			}
+			
+			
+			if(aSel && bSel){
+				Line line(*a, *b);
+				aSel = bSel = false;
+			}
+		}
+		}
+		
 	
 
 }
