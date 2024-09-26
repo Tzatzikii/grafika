@@ -18,8 +18,8 @@
 //
 // NYILATKOZAT
 // ---------------------------------------------------------------------------------------------
-// Nev    : 
-// Neptun : 
+// Nev    : Klemm Gabor
+// Neptun : H8XK58
 // ---------------------------------------------------------------------------------------------
 // ezennel kijelentem, hogy a feladatot magam keszitettem, es ha barmilyen segitseget igenybe vettem vagy
 // mas szellemi termeket felhasznaltam, akkor a forrast es az atvett reszt kommentekben egyertelmuen jeloltem.
@@ -33,85 +33,122 @@
 //=============================================================================================
 #include "framework.h"
 
+float pyth2d(float a, float b){
+	return std::sqrt(a*a + b*b);
+}
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330
-	precision highp float;		// normal floats, makes no difference on desktop computers
-
-	uniform mat4 MVP;			// uniform variable, the Model-View-Projection transformation matrix
-	layout(location = 0) in vec2 vp;	// Varying input: vp = vertex position is expected in attrib array 0
-
+	layout(location = 0) in vec3 vertexPosition;
 	void main() {
-		gl_Position = vec4(vp.x, vp.y, 0, 1) * MVP;		// transform vp from modeling space to normalized device space
+		gl_Position = vec4(vertexPosition, 1); // in NDC
 	}
 )";
 
 // fragment shader in GLSL
 const char * const fragmentSource = R"(
 	#version 330
-	precision highp float;	// normal floats, makes no difference on desktop computers
-	
-	uniform vec3 color;		// uniform variable, the color of the primitive
-	out vec4 outColor;		// computed color of the current pixel
-
+	uniform vec3 color;
+	out vec4 fragmentColor;
 	void main() {
-		outColor = vec4(color, 1);	// computed color is the color of the primitive
+		fragmentColor = vec4(color, 1);
 	}
 )";
 
+GPUProgram gpuProgram; // vertex and fragment shaders
+//unsigned int vao;	   // virtual world on the GPU
+
 class Object{
 	unsigned int vao, vbo; 
-}
+	std::vector<vec3> vertices;
+public:
+	void create(){
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
+		glGenBuffers(1, &vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+	}
 
-GPUProgram gpuProgram; // vertex and fragment shaders
-unsigned int vao;	   // virtual world on the GPU
+	std::vector<vec3>& getVertices() {
+		return vertices;
+	}
+
+	void updateGPU(){
+		glBindVertexArray(vao);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(vec3), &vertices[0], GL_DYNAMIC_DRAW);
+	}
+
+	void draw(int type, vec3 color) {
+		if(vertices.size() > 0) {
+			glBindVertexArray(vao);
+			gpuProgram.setUniform(color, "color");
+			glDrawArrays(type, 0, vertices.size());
+		}
+	}
+};
+
+class PointCollection{
+	Object points;
+	size_t pointCount;
+	
+public:
+	vec3* editPoint;
+	void create(){
+		editPoint = nullptr;
+		points.create();
+		pointCount = 0;
+	}
+	void addPoint(vec3 pos){
+		pointCount++;
+		printf("%f, %f\n", pos.x, pos.y);
+		points.getVertices().push_back(pos);
+	}
+
+	vec3& findNearest(float mX, float mY){
+		vec3& nearest = points.getVertices()[0];
+		float minDist = pyth2d(mX - nearest.x, mY - nearest.y);
+
+		for(vec3& vtx : points.getVertices()){
+			if(float tempDist = pyth2d(mX-vtx.x, mY-vtx.y) < minDist){
+				minDist = tempDist;
+				nearest = vtx;
+			}
+		}
+		return nearest;
+	}
+
+	void drawPoints(vec3 color){
+		points.updateGPU();
+		points.draw(GL_POINTS, color);
+	}
+
+	size_t getCount(){return pointCount; }
+};
+
+PointCollection pointCollection;
+
 
 // Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
-	glGenVertexArrays(1, &vao);	// get 1 vao id
-	glBindVertexArray(vao);		// make it active
-
-	unsigned int vbo;		// vertex buffer object
-	glGenBuffers(1, &vbo);	// Generate 1 buffer
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	// Geometry with 24 bytes (6 floats or 3 x 2 coordinates)
-	float vertices[] = { -0.8f, -0.8f, -0.6f, 1.0f, 0.8f, -0.2f };
-	glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
-		sizeof(vertices),  // # bytes
-		vertices,	      	// address
-		GL_STATIC_DRAW);	// we do not change later
-
-	glEnableVertexAttribArray(0);  // AttribArray 0
-	glVertexAttribPointer(0,       // vbo -> AttribArray 0
-		2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
-		0, NULL); 		     // stride, offset: tightly packed
+	glPointSize(10);
+	pointCollection.create();
 
 	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
 
+
 // Window has become invalid: Redraw
 void onDisplay() {
-	glClearColor(0, 0, 0, 0);     // background color
+	glClearColor(0.3, 0.3, 0.3, 0);     // background color
 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
-	// Set color to (0, 1, 0) = green
-	int location = glGetUniformLocation(gpuProgram.getId(), "color");
-	glUniform3f(location, 0.0f, 1.0f, 0.0f); // 3 floats
-
-	float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
-							  0, 1, 0, 0,    // row-major!
-							  0, 0, 1, 0,
-							  0, 0, 0, 1 };
-
-	location = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-	glUniformMatrix4fv(location, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
-
-	glBindVertexArray(vao);  // Draw call
-	glDrawArrays(GL_TRIANGLES, 0 /*startIdx*/, 3 /*# Elements*/);
-
+	pointCollection.drawPoints(vec3(1, 0, 0));
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
@@ -129,29 +166,25 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 	// Convert to normalized device space
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-	printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
+	//printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
+	if(pointCollection.editPoint != nullptr){
+		pointCollection.editPoint->x = cX;
+		pointCollection.editPoint->y = cY;
+	}
 }
 
-// Mouse click event
-void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+
+void onMouse(int button, int state, int pX, int pY) {
+	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-
-	char * buttonStat;
-	switch (state) {
-	case GLUT_DOWN: buttonStat = "pressed"; break;
-	case GLUT_UP:   buttonStat = "released"; break;
-	}
-
-	switch (button) {
-	case GLUT_LEFT_BUTTON:   printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);   break;
-	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+	
+	if(state == GLUT_DOWN && button == GLUT_LEFT_BUTTON) {
+		pointCollection.addPoint(vec3(cX, cY, 1));
 	}
 }
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
 	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
+	glutPostRedisplay();
 }
