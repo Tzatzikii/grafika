@@ -58,6 +58,16 @@ const char * const fragmentSource = R"(
 GPUProgram gpuProgram; // vertex and fragment shaders
 //unsigned int vao;	   // virtual world on the GPU
 
+float clamp(float n, float min, float max) {
+	if(n < min) return min;
+	else if(n > max) return max;
+	else return n;
+}
+
+bool insideBoundary(float n, float min, float max) {
+	return n > min && n < max;
+}
+
 class Object{
 	unsigned int vao, vbo; 
 	std::vector<vec3> vertices;
@@ -134,11 +144,12 @@ public:
 };
 
 class Line{
-	vec3 n;
+	vec3 n, p;
 	float param;
 public:
 	Line(vec3 a, vec3 b) {
 		n = { a.y - b.y, b.x - a.x, 0 };
+		p = a;
 		param = dot(a, n);
 		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
 	}
@@ -152,6 +163,36 @@ public:
 
 	bool through(const vec3& point) const {
 		return std::abs(dot(point, n) - param) <= 0.01; 
+	}
+	vec3 getN() { return n; }
+	vec3 getP() { return p; }
+};
+
+class LineCollection {
+	Object lines;
+	std::vector<Line> lineData;
+public:
+	vec3 getBorderPoint(Line line, vec3 p, vec3 v, int dir) {
+		while(insideBoundary(p.x, 1.0f, -1.0f) && insideBoundary(p.y, 1.0f, -1.0f)) {
+			p = p + v*dir;
+		}
+		clamp(p.x, 1.1f, -1.1f);
+		clamp(p.y, 1.1f, -1.1f);
+		if(!insideBoundary(p.x, 1.05, -1.05)) {
+			
+		}
+	}
+	void addLine(Line line) {
+		lineData.push_back(line);
+		vec3 a = line.getP();
+		vec3 b = line.getP();
+		vec3 v = { line.getN().y, -line.getN().x, 0 };
+		
+	}
+	void draw() {
+		if(lines.getVertices().size() < 2) return;
+		lines.updateGPU();
+		lines.draw(GL_LINE, vec3(0, 1, 1));
 	}
 };
 
@@ -231,9 +272,7 @@ void onMouse(int button, int state, int pX, int pY) {
 				b = pt;
 				if(b != a) bSel = true;
 				if(bSel) printf("B point selected\n");
-			}
-			
-			
+			}	
 			if(aSel && bSel){
 				Line line(*a, *b);
 				aSel = bSel = false;
