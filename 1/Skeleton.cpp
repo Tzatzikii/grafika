@@ -154,10 +154,14 @@ public:
 		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
 	}
 
+	float distanceFromPoint(float cX, float cY) {
+		return std::abs(n.x*cX + n.y*cY - param)/ pyth2d(n.x, n.y);
+	}
+
 	vec3 intersect(Line line) const {
 		float f = line.n.x / n.x;
 		float y = (f*param - line.param)/(f*n.y - line.n.y);
-		float x = (param - n.y)/n.x;
+		float x = (param - n.y*y)/n.x;
 		return vec3(x, y, 1);
 	}
 
@@ -203,6 +207,31 @@ public:
 		lines.updateGPU();
 		lines.draw(GL_LINES, color);
 	}
+
+	int findNearest(float cX, float cY) {
+		Line nearest = lineData[0];
+		float minDist = nearest.distanceFromPoint(cX, cY);
+		int index = 0;
+		for(int i = 1; i < lineData.size(); i++) {
+			Line temp = lineData[i];
+			float dist = temp.distanceFromPoint(cX, cY);
+			if(dist < minDist) {
+				minDist = dist;
+				nearest = temp;
+				index = i;
+			}
+		}
+		return index;
+	}
+	int distanceByIndex( int index, float cX, float cY ) {
+		return lineData[index].distanceFromPoint(cX, cY);
+	}
+	vec3 intersect(int index1, int index2) {
+		return lineData[index1].intersect(lineData[index2]);
+	}
+	void moveTo(int index, float cX, float cY) {
+
+	}
 };
 
 PointCollection pointCollection;
@@ -234,14 +263,16 @@ void onDisplay() {
 enum programModes {
 	createPoints = 0,
 	createLine = 1,
-	moveLine = 2
+	intersection = 2,
+	moveLine = 3
 };
 int mode = -1;
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
 	switch(key){
 	case 'p': mode = createPoints; break;
-	case 'l': mode = createLine;
+	case 'l': mode = createLine; break;
+	case 'i': mode = intersection; break;
 	}
 }
 
@@ -284,10 +315,35 @@ void onMouse(int button, int state, int pX, int pY) {
 				if(b != a) bSel = true;
 				if(bSel) printf("B point selected\n");
 			}	
-			if(aSel && bSel){
+			if(aSel && bSel) {
 				lineCollection.addLine(Line(*a, *b));
 				aSel = bSel = false;
 			}
+		break;
+		}
+		case intersection: {
+			static int e, f;
+			static bool eSel = false;
+			static bool fSel = false;
+
+			int line = lineCollection.findNearest(cX, cY);
+			float dist = lineCollection.distanceByIndex(line, cX, cY);
+			if(!eSel && dist < lineClickThreshold) {
+				e = line;
+				eSel = true;
+				if(eSel) printf("E line selected\n");
+			}else if(!fSel && dist < lineClickThreshold) {
+				f = line;
+				if(f != e ) fSel = true;
+				if(fSel) printf("F line selected\n");
+			}
+			if(eSel && fSel) {
+				pointCollection.addPoint(lineCollection.intersect(e, f));
+				eSel = fSel = false;
+			}
+
+
+		break;
 		}
 		}
 		
