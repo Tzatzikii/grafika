@@ -171,13 +171,18 @@ public:
 	vec3 getN() { return n; }
 	vec3 getP() { return p; }
 	float getParam() { return param; }
+	void setParam(float newParam) { param = newParam; }
 };
 
 class LineCollection {
 	Object lines;
 	std::vector<Line> lineData;
 public:
-	void create() { lines.create(); }
+	int selectedLine;
+	void create() { 
+		lines.create(); 
+		selectedLine = -1;
+	}
 	vec3 getBorderPoint(Line line, vec3 p, vec3 v, int dir) {
 		while(insideBoundary(p.x, 1.05f, -1.05f) && insideBoundary(p.y, 1.05f, -1.05f)) {
 			p = p + v*dir;
@@ -229,8 +234,16 @@ public:
 	vec3 intersect(int index1, int index2) {
 		return lineData[index1].intersect(lineData[index2]);
 	}
-	void moveTo(int index, float cX, float cY) {
-
+	void updateLine(int index, float cX, float cY){
+		vec3& v0 = lines.getVertices()[index*2];
+		vec3& v1 = lines.getVertices()[index*2 + 1];
+		v0 = getBorderPoint(lineData[index], cX, cY, 1);
+		v1 = getBorderPoint(lineData[index], cX, cY, -1);
+	}
+	void moveTo(float cX, float cY) {
+		Line& current = lineData[selectedLine];
+		current.setParam(dot(current.getN(), vec3(cX, cY, 1)));
+		updateLine(selectedLine, cX, cY);
 	}
 };
 
@@ -273,6 +286,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 	case 'p': mode = createPoints; break;
 	case 'l': mode = createLine; break;
 	case 'i': mode = intersection; break;
+	case 'm': mode = moveLine; break;
 	}
 }
 
@@ -287,6 +301,9 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 	//printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
+	if(lineCollection.selectedLine > -1) {
+		lineCollection.moveTo(cX, cY);
+	}
 }
 
 
@@ -296,7 +313,7 @@ void onMouse(int button, int state, int pX, int pY) {
 	float pointClickThreshold = 0.02;
 	float lineClickThreshold = 0.01;
 
-	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
+	if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
 		switch(mode){
 		case createPoints: pointCollection.addPoint(vec3(cX, cY, 1)); break;
 		case createLine: {
@@ -343,11 +360,22 @@ void onMouse(int button, int state, int pX, int pY) {
 			}
 
 
+		break;		
+		}
+		case moveLine: {
+			int line = lineCollection.findNearest(cX, cY);
+			float dist = lineCollection.distanceByIndex(line, cX, cY);
+			if(dist < lineClickThreshold) lineCollection.selectedLine = line;
 		break;
 		}
 		}
-		
 	
+	}
+	if(button == GLUT_LEFT_BUTTON && state == GLUT_UP) {
+		switch(mode) {
+		case moveLine: lineCollection.selectedLine = -1; break;
+		}
+	}
 
 }
 
