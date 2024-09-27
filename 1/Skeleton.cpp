@@ -58,13 +58,13 @@ const char * const fragmentSource = R"(
 GPUProgram gpuProgram; // vertex and fragment shaders
 //unsigned int vao;	   // virtual world on the GPU
 
-float clamp(float n, float min, float max) {
+float clamp(float n, float max, float min) {
 	if(n < min) return min;
 	else if(n > max) return max;
 	else return n;
 }
 
-bool insideBoundary(float n, float min, float max) {
+bool insideBoundary(float n, float max, float min) {
 	return n > min && n < max;
 }
 
@@ -166,46 +166,56 @@ public:
 	}
 	vec3 getN() { return n; }
 	vec3 getP() { return p; }
+	float getParam() { return param; }
 };
 
 class LineCollection {
 	Object lines;
 	std::vector<Line> lineData;
 public:
+	void create() { lines.create(); }
 	vec3 getBorderPoint(Line line, vec3 p, vec3 v, int dir) {
-		while(insideBoundary(p.x, 1.0f, -1.0f) && insideBoundary(p.y, 1.0f, -1.0f)) {
+		while(insideBoundary(p.x, 1.05f, -1.05f) && insideBoundary(p.y, 1.05f, -1.05f)) {
 			p = p + v*dir;
 		}
-		clamp(p.x, 1.1f, -1.1f);
-		clamp(p.y, 1.1f, -1.1f);
+		p.x = clamp(p.x, 1.1f, -1.1f);
+		p.y = clamp(p.y, 1.1f, -1.1f);
 		if(!insideBoundary(p.x, 1.05, -1.05)) {
-			
+			p.y = (line.getParam() - line.getN().x*p.x)/line.getN().y;
 		}
+		else if(!insideBoundary(p.y, 1.05f, -1.05f)) {
+			p.x = (line.getParam() - line.getN().y*p.y)/line.getN().x;
+		}
+		return p;
 	}
 	void addLine(Line line) {
 		lineData.push_back(line);
-		vec3 a = line.getP();
-		vec3 b = line.getP();
 		vec3 v = { line.getN().y, -line.getN().x, 0 };
+		vec3 a = getBorderPoint( line, line.getP(), v, 1 );
+		vec3 b = getBorderPoint( line, line.getP(), v, -1 );
+
+		lines.getVertices().push_back(a);
+		lines.getVertices().push_back(b);
 		
 	}
-	void draw() {
+	void drawLines(vec3 color) {
 		if(lines.getVertices().size() < 2) return;
 		lines.updateGPU();
-		lines.draw(GL_LINE, vec3(0, 1, 1));
+		lines.draw(GL_LINES, color);
 	}
 };
 
 PointCollection pointCollection;
-
+LineCollection lineCollection;
 
 // Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
 	glPointSize(10);
+	glLineWidth(5);
 	pointCollection.create();
-
+	lineCollection.create();
 	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
@@ -216,6 +226,7 @@ void onDisplay() {
 	glClearColor(0.3, 0.3, 0.3, 0);     // background color
 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
+	lineCollection.drawLines(vec3(0, 1, 1));
 	pointCollection.drawPoints(vec3(1, 0, 0));
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
@@ -274,7 +285,7 @@ void onMouse(int button, int state, int pX, int pY) {
 				if(bSel) printf("B point selected\n");
 			}	
 			if(aSel && bSel){
-				Line line(*a, *b);
+				lineCollection.addLine(Line(*a, *b));
 				aSel = bSel = false;
 			}
 		}
