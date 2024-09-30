@@ -237,8 +237,9 @@ public:
 	void updateLine(int index, float cX, float cY){
 		vec3& v0 = lines.getVertices()[index*2];
 		vec3& v1 = lines.getVertices()[index*2 + 1];
-		v0 = getBorderPoint(lineData[index], cX, cY, 1);
-		v1 = getBorderPoint(lineData[index], cX, cY, -1);
+		Line line = lineData[index];
+		v0 = getBorderPoint(line, vec3(cX, cY, 1), vec3(line.getN().y, -line.getN().x), 1);
+		v1 = getBorderPoint(line, vec3(cX, cY, 1), vec3(line.getN().y, -line.getN().x), -1);
 	}
 	void moveTo(float cX, float cY) {
 		Line& current = lineData[selectedLine];
