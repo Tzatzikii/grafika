@@ -154,11 +154,14 @@ public:
 		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
 	}
 
-	float distanceFromPoint(float cX, float cY) {
+	float distanceFromPoint(float cX, float cY) const {
 		return std::abs(n.x*cX + n.y*cY - param)/ pyth2d(n.x, n.y);
 	}
-
-	vec3 intersect(Line line) const {
+	
+	bool parallel(const Line& line) const {
+		return std::abs(dot(n, vec3(line.getN().y, -line.getN().x))) < 0.01;
+	}
+	vec3 intersect(const Line& line) const {
 		float f = line.n.x / n.x;
 		float y = (f*param - line.param)/(f*n.y - line.n.y);
 		float x = (param - n.y*y)/n.x;
@@ -168,8 +171,8 @@ public:
 	bool through(const vec3& point) const {
 		return std::abs(dot(point, n) - param) <= 0.01; 
 	}
-	vec3 getN() { return n; }
-	vec3 getP() { return p; }
+	vec3 getN() const { return n; }
+	vec3 getP() const { return p; }
 	float getParam() { return param; }
 	void setParam(float newParam) { param = newParam; }
 };
@@ -230,6 +233,10 @@ public:
 	}
 	int distanceByIndex( int index, float cX, float cY ) {
 		return lineData[index].distanceFromPoint(cX, cY);
+	}
+
+	bool parallel(int index1, int index2) const {
+		return lineData[index1].parallel(lineData[index2]);
 	}
 	vec3 intersect(int index1, int index2) {
 		return lineData[index1].intersect(lineData[index2]);
@@ -356,7 +363,8 @@ void onMouse(int button, int state, int pX, int pY) {
 				if(fSel) printf("F line selected\n");
 			}
 			if(eSel && fSel) {
-				pointCollection.addPoint(lineCollection.intersect(e, f));
+				vec3 intersection = lineCollection.intersect(e, f);
+				if(!lineCollection.parallel(e, f) && insideBoundary(intersection.x, 1, -1) && insideBoundary(intersection.y, 1, -1)) pointCollection.addPoint(intersection);
 				eSel = fSel = false;
 			}
 
