@@ -113,7 +113,7 @@ public:
 	}
 	void addPoint(vec3 pos){
 		pointCount++;
-		printf("%f, %f\n", pos.x, pos.y);
+		printf("Point %.1f, %.1f added\n", pos.x, pos.y);
 		points.getVertices().push_back(pos);
 		points.updateGPU();
 	}
@@ -151,7 +151,8 @@ public:
 		n = { a.y - b.y, b.x - a.x, 0 };
 		p = a;
 		param = dot(a, n);
-		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
+		printf("Line added\n\tImplicit: %.1f x + %.1f y = %.1f\n\tParametric: r(t) = (%.1f, %.1f) + (%.1f, %.1f)t\n",
+			n.x, n.y, param, a.x, a.y, n.y, -n.x);
 	}
 
 	float distanceFromPoint(float cX, float cY) const {
@@ -292,9 +293,9 @@ int mode = -1;
 void onKeyboard(unsigned char key, int pX, int pY) {
 	switch(key){
 	case 'p': mode = createPoints; break;
-	case 'l': mode = createLine; break;
-	case 'i': mode = intersection; break;
-	case 'm': mode = moveLine; break;
+	case 'l': mode = createLine; printf("Define lines\n"); break;
+	case 'i': mode = intersection; printf("Intersect\n"); break;
+	case 'm': mode = moveLine; printf("Move\n"); break;
 	}
 }
 
@@ -334,11 +335,9 @@ void onMouse(int button, int state, int pX, int pY) {
 			if(!aSel && dist < pointClickThreshold) {
 				a = pt;
 				aSel = true;
-				if(aSel) printf("A point selected\n");
 			}else if(!bSel && dist < pointClickThreshold) {
 				b = pt;
 				if(b != a) bSel = true;
-				if(bSel) printf("B point selected\n");
 			}	
 			if(aSel && bSel) {
 				lineCollection.addLine(Line(*a, *b));
@@ -356,11 +355,9 @@ void onMouse(int button, int state, int pX, int pY) {
 			if(!eSel && dist < lineClickThreshold) {
 				e = line;
 				eSel = true;
-				if(eSel) printf("E line selected\n");
 			}else if(!fSel && dist < lineClickThreshold) {
 				f = line;
 				if(f != e ) fSel = true;
-				if(fSel) printf("F line selected\n");
 			}
 			if(eSel && fSel) {
 				vec3 intersection = lineCollection.intersect(e, f);
