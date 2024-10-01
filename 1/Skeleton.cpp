@@ -163,11 +163,12 @@ public:
 		return std::abs(dot(n, vec3(line.getN().y, -line.getN().x))) < 0.01;
 	}
 	vec3 intersect(const Line& line) const {
-		float f = line.n.x / n.x;
-		float y = (f*param - line.param)/(f*n.y - line.n.y);
-		float x = (param - n.y*y)/n.x;
-		return vec3(x, y, 1);
-	}
+		vec3 v1 = { n.x, n.y, -param };
+		vec3 v2 = { line.n.x, line.n.y, -line.param };
+		vec3 c = cross(v1, v2);
+		return c/c.z;
+
+	}	
 
 	bool through(const vec3& point) const {
 		return std::abs(dot(point, n) - param) <= 0.01; 
