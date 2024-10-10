@@ -36,7 +36,6 @@
 float pyth2d(float a, float b){
 	return std::sqrt(a*a + b*b);
 }
-// vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330
 	layout(location = 0) in vec3 vertexPosition;
@@ -45,7 +44,6 @@ const char * const vertexSource = R"(
 	}
 )";
 
-// fragment shader in GLSL
 const char * const fragmentSource = R"(
 	#version 330
 	uniform vec3 color;
@@ -55,8 +53,7 @@ const char * const fragmentSource = R"(
 	}
 )";
 
-GPUProgram gpuProgram; // vertex and fragment shaders
-//unsigned int vao;	   // virtual world on the GPU
+GPUProgram gpuProgram;
 
 float clamp(float n, float max, float min) {
 	if(n < min) return min;
@@ -113,7 +110,7 @@ public:
 	}
 	void addPoint(vec3 pos){
 		pointCount++;
-		printf("%f, %f\n", pos.x, pos.y);
+		printf("Point %f, %f added\n", pos.x, pos.y);
 		points.getVertices().push_back(pos);
 		points.updateGPU();
 	}
@@ -151,17 +148,24 @@ public:
 		n = { a.y - b.y, b.x - a.x, 0 };
 		p = a;
 		param = dot(a, n);
-		printf("Line: %fx + %fy = %f\n", n.x, n.y, param);
+		printf("Line added\n\tImplcit: %fx + %fy = %f\n\tParametric: (%f, %f) + (%f, %f)t\n",
+			n.x, n.y, param, a.x, a.y, -n.y, n.x);
 	}
 
+	bool parallel(Line line) {
+		vec3 v = { line.n.y, -line.n.x };
+		return std::abs(dot(n, v)) < 0.01 ? true : false;
+	}
 	float distanceFromPoint(float cX, float cY) {
 		return std::abs(n.x*cX + n.y*cY - param)/ pyth2d(n.x, n.y);
 	}
 
 	vec3 intersect(Line line) const {
+		if(line.parallel(*this)) throw(-1);
 		float f = line.n.x / n.x;
 		float y = (f*param - line.param)/(f*n.y - line.n.y);
 		float x = (param - n.y*y)/n.x;
+		if(!insideBoundary(x, 1, -1) || !insideBoundary(y, 1, -1)) throw(-1);
 		return vec3(x, y, 1);
 	}
 
@@ -251,7 +255,6 @@ public:
 PointCollection pointCollection;
 LineCollection lineCollection;
 
-// Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
@@ -259,19 +262,17 @@ void onInitialization() {
 	glLineWidth(5);
 	pointCollection.create();
 	lineCollection.create();
-	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
 
 
-// Window has become invalid: Redraw
 void onDisplay() {
-	glClearColor(0.3, 0.3, 0.3, 0);     // background color
-	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
+	glClearColor(0.3, 0.3, 0.3, 0);   
+	glClear(GL_COLOR_BUFFER_BIT); 
 
 	lineCollection.drawLines(vec3(0, 1, 1));
 	pointCollection.drawPoints(vec3(1, 0, 0));
-	glutSwapBuffers(); // exchange buffers for double buffering
+	glutSwapBuffers(); 
 }
 
 enum programModes {
@@ -285,23 +286,19 @@ int mode = -1;
 void onKeyboard(unsigned char key, int pX, int pY) {
 	switch(key){
 	case 'p': mode = createPoints; break;
-	case 'l': mode = createLine; break;
-	case 'i': mode = intersection; break;
-	case 'm': mode = moveLine; break;
+	case 'l': mode = createLine; printf("Define lines\n"); break;
+	case 'i': mode = intersection; printf("Intersect\n"); break;
+	case 'm': mode = moveLine; printf("Move\n"); break;
 	}
 }
 
-// Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 
 }
 
-// Move mouse with key pressed
-void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+void onMouseMotion(int pX, int pY) {
+	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-	//printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
 	if(lineCollection.selectedLine > -1) {
 		lineCollection.moveTo(cX, cY);
 	}
@@ -327,11 +324,9 @@ void onMouse(int button, int state, int pX, int pY) {
 			if(!aSel && dist < pointClickThreshold) {
 				a = pt;
 				aSel = true;
-				if(aSel) printf("A point selected\n");
 			}else if(!bSel && dist < pointClickThreshold) {
 				b = pt;
 				if(b != a) bSel = true;
-				if(bSel) printf("B point selected\n");
 			}	
 			if(aSel && bSel) {
 				lineCollection.addLine(Line(*a, *b));
@@ -349,14 +344,16 @@ void onMouse(int button, int state, int pX, int pY) {
 			if(!eSel && dist < lineClickThreshold) {
 				e = line;
 				eSel = true;
-				if(eSel) printf("E line selected\n");
 			}else if(!fSel && dist < lineClickThreshold) {
 				f = line;
 				if(f != e ) fSel = true;
-				if(fSel) printf("F line selected\n");
 			}
 			if(eSel && fSel) {
-				pointCollection.addPoint(lineCollection.intersect(e, f));
+				vec3 intersection;
+				int err = 0;
+				try { intersection = lineCollection.intersect(e, f); } 
+				catch(int e) { err = e; }
+				if(err > -1) { pointCollection.addPoint(lineCollection.intersect(e, f)); }
 				eSel = fSel = false;
 			}
 
@@ -380,8 +377,6 @@ void onMouse(int button, int state, int pX, int pY) {
 
 }
 
-// Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
 	glutPostRedisplay();
 }
