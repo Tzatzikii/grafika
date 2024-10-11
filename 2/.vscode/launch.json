@@ -8,7 +8,7 @@
                 "name": "Thing",
                 "type": "cppdbg",
                 "request": "launch",
-                "program": "${workspaceRoot}/main",
+                "program": "${workspaceFolder}/main",
                 "cwd": ".",
                 "linux": {
                         "MIMode": "gdb",
