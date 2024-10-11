@@ -88,11 +88,13 @@ public:
 		updateGPU();
 	}
 	void updateGPU(){
+		glBindVertexArray(vao);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 		glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(vec3), &vertices[0], GL_DYNAMIC_DRAW);
 	}
 
 	void draw(GLenum mode, vec3 color) {
-		//glBindVertexArray(vao);
+		updateGPU();
 		gpuProgram.setUniform(color, "color");
 		glDrawArrays(mode, 0, vertices.size());
 	}
@@ -131,12 +133,53 @@ public:
 		obj.transform(rotation);
 	}
 };
+
+class CRSpline {
+	Object spline;
+	std::vector<vec3> cpoints;
+	std::vector<int> params;
+	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t) {
+
+	}
+
+public:
+	void create(){
+		spline.create();
+	}
+	void addCPoint(vec3 pos) {
+		if(params.size() == 0) params.push_back(0);
+		else { params.push_back(params[params.size()-1] + 1); }
+		cpoints.push_back(pos);
+		spline.load(pos);
+	}
+	vec3 expandSpline(){
+		// vec3 vi, vi1;
+		// vi = vi1 = {0, 0, 1};
+		// for(int i = 0; i < cpoints.size() - 1; i++) {
+		// 	spline.load(hermite({ cpoints[i].x, cpoints[i].y, 1.0f }, 
+		// 				{ cpoints[i+1].x, cpoints[i+1].y, 1.0f },
+		// 				));
+		// 	vi = 1/2*(()/() + ()/())
+		// }
+		
+	}
+	void draw() {
+		spline.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 0.0f });
+		spline.draw(GL_POINTS, { 1.0f, 0.0f, 0.0f });
+	}
+};
+CRSpline spline;
 Ball ball;
 
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
-
+	glPointSize(10);
 	ball.create();
+	spline.create();
+	spline.addCPoint({0, 0, 1});
+	spline.addCPoint({0.34, -0.54, 1});
+	spline.addCPoint({-0.2234, -0.1123, 1});
+	//spline.expandSpline();
 
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
@@ -159,6 +202,7 @@ void onDisplay() {
 
 	
 	ball.draw();
+	spline.draw();
 	glutSwapBuffers(); // exchange buffers for double buffering
 }
 
