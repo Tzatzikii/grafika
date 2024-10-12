@@ -36,7 +36,6 @@
 float pyth2d(float a, float b){
 	return std::sqrt(a*a + b*b);
 }
-// vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330
 	layout(location = 0) in vec3 vertexPosition;
@@ -45,7 +44,6 @@ const char * const vertexSource = R"(
 	}
 )";
 
-// fragment shader in GLSL
 const char * const fragmentSource = R"(
 	#version 330
 	uniform vec3 color;
@@ -55,8 +53,7 @@ const char * const fragmentSource = R"(
 	}
 )";
 
-GPUProgram gpuProgram; // vertex and fragment shaders
-//unsigned int vao;	   // virtual world on the GPU
+GPUProgram gpuProgram;
 
 float clamp(float n, float max, float min) {
 	if(n < min) return min;
@@ -260,7 +257,6 @@ public:
 PointCollection pointCollection;
 LineCollection lineCollection;
 
-// Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 
@@ -268,19 +264,17 @@ void onInitialization() {
 	glLineWidth(5);
 	pointCollection.create();
 	lineCollection.create();
-	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
 
 
-// Window has become invalid: Redraw
 void onDisplay() {
-	glClearColor(0.3, 0.3, 0.3, 0);     // background color
-	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
+	glClearColor(0.3, 0.3, 0.3, 0);   
+	glClear(GL_COLOR_BUFFER_BIT); 
 
 	lineCollection.drawLines(vec3(0, 1, 1));
 	pointCollection.drawPoints(vec3(1, 0, 0));
-	glutSwapBuffers(); // exchange buffers for double buffering
+	glutSwapBuffers(); 
 }
 
 enum programModes {
@@ -300,17 +294,13 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 	}
 }
 
-// Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 
 }
 
-// Move mouse with key pressed
-void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+void onMouseMotion(int pX, int pY) {
+	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-	//printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
 	if(lineCollection.selectedLine > -1) {
 		lineCollection.moveTo(cX, cY);
 	}
@@ -386,8 +376,6 @@ void onMouse(int button, int state, int pX, int pY) {
 
 }
 
-// Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
 	glutPostRedisplay();
 }
