@@ -1,5 +1,10 @@
 {
         "files.associations": {
-                "random": "cpp"
-        }
+                "random": "cpp",
+                "vector": "cpp",
+                "string": "cpp",
+                "deque": "cpp",
+                "cmath": "cpp"
+        },
+        "C_Cpp.errorSquiggles": "enabled"
 }

@@ -87,6 +87,11 @@ public:
 		}
 		updateGPU();
 	}
+
+	void clear() {
+		vertices.clear();
+	}
+
 	void updateGPU(){
 		glBindVertexArray(vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -104,9 +109,11 @@ class Ball {
 	Object obj;
 	vec3 centre;
 	float r;
+	vec3 v;
 
 public:
-	void create() {
+	void create(vec3 pos) {
+		v = {0, 0, 1};
 		r = 0.075f;
 		obj.create();
 		float nRot = 15;
@@ -121,6 +128,9 @@ public:
 		obj.load({ 0.0f, 0.0f, 1.0f });
 		obj.load({ r, 0.0f, 1.0f });
 		obj.load({ -r, 0.0f, 1.0f });
+
+		mat4 t = TranslateMatrix(pos);
+		obj.transform(t);
 		obj.updateGPU();
 	}
 
@@ -128,44 +138,79 @@ public:
 		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
 		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
 	}
-	void rotate(float phi) {
-		mat4 rotation = RotationMatrix(phi, { 0.0f, 0.0f, 1.0f });
-		obj.transform(rotation);
+	void animate(float dt) {
+		vec3 g = {0, -4, 0};
+		mat4 f = TranslateMatrix((v+g)*dt);
+		obj.transform(f);
+
 	}
 };
 
 class CRSpline {
 	Object spline;
+	Object points;
 	std::vector<vec3> cpoints;
-	std::vector<int> params;
+	std::vector<int> ts;
+	float smoothness;
 	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t) {
+		vec3 ret;
+		vec3 a0 = p0;
+		vec3 a1 = v0;
+		vec3 a2 = 3*(p1 - p0) - (v1 + 2*v0);
+		vec3 a3 = 2*(p0 - p1) + (v1 + v0);
+		ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0);
+		ret.z = 1;
+		return ret;
+		// vec3 a2 = 3*(p1 - p0)/std::pow((t1 - t0), 2) - (v0 + 2*v0)/(t1 - t0);
+		// vec3 a3 = 2*(p0 - p1)/std::pow((t1 - t0), 3) + (v1 + v0)/std::pow((t1 - t0), 2);
+		// return (a3*std::pow((t - t0), 3) + a2*std::pow((t - t0), 2) + a1*(t - t0) + a0);
 
 	}
 
 public:
 	void create(){
+		smoothness = 100.0f;
 		spline.create();
+		points.create();
 	}
 	void addCPoint(vec3 pos) {
-		if(params.size() == 0) params.push_back(0);
-		else { params.push_back(params[params.size()-1] + 1); }
 		cpoints.push_back(pos);
-		spline.load(pos);
+		points.load(pos);
+
+		if(ts.empty()) ts.push_back(0);
+		else { ts.push_back(ts.back() + 1); }
+		if(cpoints.size() >= 2) generateVertices();
 	}
-	vec3 expandSpline(){
-		// vec3 vi, vi1;
-		// vi = vi1 = {0, 0, 1};
-		// for(int i = 0; i < cpoints.size() - 1; i++) {
-		// 	spline.load(hermite({ cpoints[i].x, cpoints[i].y, 1.0f }, 
-		// 				{ cpoints[i+1].x, cpoints[i+1].y, 1.0f },
-		// 				));
-		// 	vi = 1/2*(()/() + ()/())
-		// }
-		
+	vec3 r(float t) {
+		for(int i = 0; i < cpoints.size(); i++) {
+			if(t >= ts[i] && t <= ts[i+1]) {				
+				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
+				vec3 v1 = ((cpoints[i+2] - cpoints[i+1]) + (cpoints[i+1] - cpoints[i]))/2;
+				v0.z = v1.z = 1;
+				if(i <= 1){
+					v0 = {0, 0, 1};
+				}
+				if(i >= cpoints.size() - 2){
+					v1 = {0, 0, 1};
+				}
+				
+				return hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t);
+			}
+		}
 	}
+
+	void generateVertices()	{
+		spline.clear();
+		float n = ts.back()/smoothness;
+		for(float t = 0; t <= ts.back(); t += n) {
+			spline.load(r(t));
+			
+		}
+	}
+	
 	void draw() {
 		spline.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 0.0f });
-		spline.draw(GL_POINTS, { 1.0f, 0.0f, 0.0f });
+		points.draw(GL_POINTS, { 1.0f, 0.0f, 0.0f });
 	}
 };
 CRSpline spline;
@@ -174,12 +219,7 @@ Ball ball;
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	glPointSize(10);
-	ball.create();
 	spline.create();
-	spline.addCPoint({0, 0, 1});
-	spline.addCPoint({0.34, -0.54, 1});
-	spline.addCPoint({-0.2234, -0.1123, 1});
-	//spline.expandSpline();
 
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
@@ -208,7 +248,7 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
+	if (key == ' ') ball.create(spline.r(0.01));         // if d, invalidate display, i.e. redraw
 }
 
 // Key of ASCII code released
@@ -216,11 +256,7 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 }
 
 // Move mouse with key pressed
-void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
-	float cY = 1.0f - 2.0f * pY / windowHeight;
-	printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
+void onMouseMotion(int pX, int pY) {
 }
 
 // Mouse click event
@@ -229,21 +265,20 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 
-	char * buttonStat;
-	switch (state) {
-	case GLUT_DOWN: buttonStat = "pressed"; break;
-	case GLUT_UP:   buttonStat = "released"; break;
-	}
-
-	switch (button) {
-	case GLUT_LEFT_BUTTON:   printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);   break;
-	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
+	if(state == GLUT_DOWN && button == GLUT_LEFT) {
+		spline.addCPoint( {cX, cY, 1} );
 	}
 }
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	ball.rotate(-0.05);
-	glutPostRedisplay();
+	static float tend = 0;
+	const float dt = 0.01;
+	float tstart = tend;
+	tend = glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
+	for (float t = tstart; t < tend; t += dt) {
+		float Dt = fmin(dt, tend - t);
+		ball.animate(Dt);
+	}
+	glutPostRedisplay(); // redraw the scene
 }
