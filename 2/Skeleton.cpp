@@ -105,46 +105,6 @@ public:
 	}
 	
 };
-class Ball {
-	Object obj;
-	vec3 centre;
-	float r;
-	vec3 v;
-
-public:
-	void create(vec3 pos) {
-		v = {0, 0, 1};
-		r = 0.075f;
-		obj.create();
-		float nRot = 15;
-		vec4 v = { 0.0f, r, 1.0f, 1.0f};
-		mat4 rot = RotationMatrix(M_PI*2/nRot, {0, 0, 1});
-		for(float f = 0; f <= M_PI*2; f+=M_PI*2/nRot){
-			obj.load({v.x, v.y, 1});
-			v=v*rot;
-		}
-		obj.load({ 0.0f, r, 1.0f });
-		obj.load({ 0.0f, -r, 1.0f });
-		obj.load({ 0.0f, 0.0f, 1.0f });
-		obj.load({ r, 0.0f, 1.0f });
-		obj.load({ -r, 0.0f, 1.0f });
-
-		mat4 t = TranslateMatrix(pos);
-		obj.transform(t);
-		obj.updateGPU();
-	}
-
-	void draw() {
-		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
-		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
-	}
-	void animate(float dt) {
-		vec3 g = {0, -4, 0};
-		mat4 f = TranslateMatrix((v+g)*dt);
-		obj.transform(f);
-
-	}
-};
 
 class CRSpline {
 	Object spline;
@@ -204,7 +164,7 @@ public:
 		spline.clear();
 		float n = ts.back()/smoothness;
 		for(float t = 0; t <= ts.back(); t += n) {
-			spline.load(r(t));
+			spline.load(r(t, false));
 			
 		}
 	}
@@ -212,6 +172,48 @@ public:
 	void draw() {
 		spline.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 0.0f });
 		points.draw(GL_POINTS, { 1.0f, 0.0f, 0.0f });
+	}
+};
+class Ball {
+	Object obj;
+	vec3 centre;
+	float r;
+	vec3 v;
+
+public:
+	void create(vec3 pos) {
+		v = {0, 0, 1};
+		r = 0.075f;
+		obj.create();
+		float nRot = 15;
+		vec4 v = { 0.0f, r, 1.0f, 1.0f};
+		mat4 rot = RotationMatrix(M_PI*2/nRot, {0, 0, 1});
+		for(float f = 0; f <= M_PI*2; f+=M_PI*2/nRot){
+			obj.load({v.x, v.y, 1});
+			v=v*rot;
+		}
+		obj.load({ 0.0f, r, 1.0f });
+		obj.load({ 0.0f, -r, 1.0f });
+		obj.load({ 0.0f, 0.0f, 1.0f });
+		obj.load({ r, 0.0f, 1.0f });
+		obj.load({ -r, 0.0f, 1.0f });
+
+		mat4 t = TranslateMatrix(pos);
+		obj.transform(t);
+		obj.updateGPU();
+	}
+
+	void draw() {
+		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
+		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
+	}
+	void animate(float dt) {
+		vec3 g = {0, -4, 0};
+		v=v+g;
+		//vec3 splinev = 
+		mat4 f = TranslateMatrix(v*dt);
+		obj.transform(f);
+
 	}
 };
 CRSpline spline;
@@ -249,7 +251,7 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == ' ') ball.create(spline.r(0.01));         // if d, invalidate display, i.e. redraw
+	if (key == ' ') ball.create(spline.r(0.01, false));         // if d, invalidate display, i.e. redraw
 }
 
 // Key of ASCII code released
