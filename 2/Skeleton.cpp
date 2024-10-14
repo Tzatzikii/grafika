@@ -152,13 +152,14 @@ class CRSpline {
 	std::vector<vec3> cpoints;
 	std::vector<int> ts;
 	float smoothness;
-	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t) {
+	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t, bool derivate) {
 		vec3 ret;
 		vec3 a0 = p0;
 		vec3 a1 = v0;
 		vec3 a2 = 3*(p1 - p0) - (v1 + 2*v0);
 		vec3 a3 = 2*(p0 - p1) + (v1 + v0);
-		ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0);
+		if(derivate) ret = 3*a3*(t - t0)*(t - t0) + 2*a2*(t - t0) + a1;
+		else ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0);
 		ret.z = 1;
 		return ret;
 		// vec3 a2 = 3*(p1 - p0)/std::pow((t1 - t0), 2) - (v0 + 2*v0)/(t1 - t0);
@@ -181,7 +182,7 @@ public:
 		else { ts.push_back(ts.back() + 1); }
 		if(cpoints.size() >= 2) generateVertices();
 	}
-	vec3 r(float t) {
+	vec3 r(float t, bool derivate) {
 		for(int i = 0; i < cpoints.size(); i++) {
 			if(t >= ts[i] && t <= ts[i+1]) {				
 				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
@@ -193,8 +194,8 @@ public:
 				if(i >= cpoints.size() - 2){
 					v1 = {0, 0, 1};
 				}
+				hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t, derivate);
 				
-				return hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t);
 			}
 		}
 	}
