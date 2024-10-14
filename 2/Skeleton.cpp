@@ -105,46 +105,6 @@ public:
 	}
 	
 };
-class Ball {
-	Object obj;
-	vec3 centre;
-	float r;
-	vec3 v;
-
-public:
-	void create(vec3 pos) {
-		v = {0, 0, 1};
-		r = 0.075f;
-		obj.create();
-		float nRot = 15;
-		vec4 v = { 0.0f, r, 1.0f, 1.0f};
-		mat4 rot = RotationMatrix(M_PI*2/nRot, {0, 0, 1});
-		for(float f = 0; f <= M_PI*2; f+=M_PI*2/nRot){
-			obj.load({v.x, v.y, 1});
-			v=v*rot;
-		}
-		obj.load({ 0.0f, r, 1.0f });
-		obj.load({ 0.0f, -r, 1.0f });
-		obj.load({ 0.0f, 0.0f, 1.0f });
-		obj.load({ r, 0.0f, 1.0f });
-		obj.load({ -r, 0.0f, 1.0f });
-
-		mat4 t = TranslateMatrix(pos);
-		obj.transform(t);
-		obj.updateGPU();
-	}
-
-	void draw() {
-		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
-		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
-	}
-	void animate(float dt) {
-		vec3 g = {0, -4, 0};
-		mat4 f = TranslateMatrix((v+g)*dt);
-		obj.transform(f);
-
-	}
-};
 
 class CRSpline {
 	Object spline;
@@ -182,7 +142,7 @@ public:
 		else { ts.push_back(ts.back() + 1); }
 		if(cpoints.size() >= 2) generateVertices();
 	}
-	vec3 r(float t, bool derivate) {
+	vec3 r(float t, bool derivate = false) {
 		for(int i = 0; i < cpoints.size(); i++) {
 			if(t >= ts[i] && t <= ts[i+1]) {				
 				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
@@ -200,6 +160,7 @@ public:
 		}
 	}
 
+	float maxTau() { return ts.back(); }
 	void generateVertices()	{
 		spline.clear();
 		float n = ts.back()/smoothness;
@@ -214,7 +175,56 @@ public:
 		points.draw(GL_POINTS, { 1.0f, 0.0f, 0.0f });
 	}
 };
+
 CRSpline spline;
+
+class Ball {
+	Object obj;
+	vec3 centre;
+	float r;
+	vec3 v;
+	bool created = false;
+
+public:
+	void create(vec3 pos) {
+		created = true;
+		v = {0, 0, 1};
+		r = 0.075f;
+		obj.create();
+		float nRot = 15;
+		vec4 v = { 0.0f, r, 1.0f, 1.0f};
+		mat4 rot = RotationMatrix(M_PI*2/nRot, {0, 0, 1});
+		for(float f = 0; f <= M_PI*2; f+=M_PI*2/nRot){
+			obj.load({v.x, v.y, 1});
+			v=v*rot;
+		}
+		obj.load({ 0.0f, r, 1.0f });
+		obj.load({ 0.0f, -r, 1.0f });
+		obj.load({ 0.0f, 0.0f, 1.0f });
+		obj.load({ r, 0.0f, 1.0f });
+		obj.load({ -r, 0.0f, 1.0f });
+
+		mat4 t = TranslateMatrix(pos);
+		obj.transform(t);
+		obj.updateGPU();
+	}
+
+	void draw() {
+		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
+		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
+	}
+	void animate(float dt) {
+		static float tauTracker = 0.01;
+		vec3 g = {0, -4, 0};
+		float dtau = (length(g)/2)*dt*dt;
+		if(!created || tauTracker > spline.maxTau() ) return;
+		vec3 dx = spline.r(dtau, true);
+		mat4 f = TranslateMatrix(dx);
+		obj.transform(f);
+		tauTracker += dtau;
+
+	}
+};
 Ball ball;
 
 void onInitialization() {
