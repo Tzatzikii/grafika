@@ -90,7 +90,6 @@ public:
 
 	void clear() {
 		vertices.clear();
-		updateGPU();
 	}
 
 	void updateGPU(){
@@ -113,25 +112,15 @@ class CRSpline {
 	std::vector<vec3> cpoints;
 	std::vector<int> ts;
 	float smoothness;
-	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t, int derivative) {
+	vec3 hermite(vec3 p0, vec3 p1, vec3 v0, vec3 v1, float t0, float t1, float t, bool derivate) {
 		vec3 ret;
 		vec3 a0 = p0;
 		vec3 a1 = v0;
 		vec3 a2 = 3*(p1 - p0) - (v1 + 2*v0);
 		vec3 a3 = 2*(p0 - p1) + (v1 + v0);
-		switch(derivative){
-			case 0:{
-				ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0); ret.z = 1;
-			break;
-			}
-			case 1:{
-				ret = (3*a3*(t - t0)*(t - t0) + 2*a2*(t - t0) + a1); ret.z = 0;
-			break;
-			}
-			case 2:{
-				ret = (6*a3*(t - t0) + 2*a2); ret.z = 0;
-			}
-		}
+		if(derivate){ ret = (3*a3*(t - t0)*(t - t0) + 2*a2*(t - t0) + a1); ret.z = 0; }
+		else { ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0); ret.z = 1; }
+		
 		return ret;
 		// vec3 a2 = 3*(p1 - p0)/std::pow((t1 - t0), 2) - (v0 + 2*v0)/(t1 - t0);
 		// vec3 a3 = 2*(p0 - p1)/std::pow((t1 - t0), 3) + (v1 + v0)/std::pow((t1 - t0), 2);
@@ -153,21 +142,21 @@ public:
 		else { ts.push_back(ts.back() + 1); }
 		if(cpoints.size() >= 2) generateVertices();
 	}
-	vec3 r(float t, int derivative = 0) {
+	vec3 r(float t, bool derivate = false) {
 
 		for(int i = 0; i < cpoints.size(); i++) {
 			if(t >= ts[i] && t <= ts[i+1]) {				
 				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
 				vec3 v1 = ((cpoints[i+2] - cpoints[i+1]) + (cpoints[i+1] - cpoints[i]))/2;
 				v0.z = v1.z = 0;
-				if(i < 1){
+				if(i <= 1){
 					v0 = {0, 0, 0};
 				}
 				if(i >= cpoints.size() - 2){
 					v1 = {0, 0, 0};
 				}
 				
-				return hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t, derivative);
+				return hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t, derivate);
 			}
 		}
 	}
@@ -193,16 +182,21 @@ class Ball {
 	Object obj;
 	vec3 centre;
 	float r;
+	vec3 vtot, vgrav;
 	float tau;
+	float dtau;
 	bool created = false;
 
 public:
 	void create() {
-		if(created) return;
 		created = true;
 		tau = 0.01;
-		vec3 pos = spline.r(tau);
+		vec3 pos = spline.r(tau, false);
 		r = 0.1f;
+		dtau = spline.getDTau();
+		vec3 pos = spline.r(tau, false);
+		vtot = vgrav = {0, 0, 0};
+		r = 0.075f;
 		obj.create();
 		float nRot = 15;
 		vec4 v = { 0.0f, r, 1.0f, 1.0f};
@@ -216,11 +210,8 @@ public:
 		obj.load({ 0.0f, 0.0f, 1.0f });
 		obj.load({ r, 0.0f, 1.0f });
 		obj.load({ -r, 0.0f, 1.0f });
-		vec3 D = spline.r(tau, 1);
-		vec3 n = { -D.y, D.x, 0 };
-		n = normalize(n);
-		n=n*r;
-		mat4 t = TranslateMatrix(pos)*TranslateMatrix(n);
+
+		mat4 t = TranslateMatrix(pos);
 		obj.transform(t);
 		obj.updateGPU();
 	}
@@ -229,33 +220,22 @@ public:
 		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
 		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
 	}
-	void kill(){
-		created = false;
-		obj.clear();
-	}
 	void animate(float dt) {	
-		if(!created || tau >= spline.maxTau()){ kill(); return; }
-		float g = 4.0f;
-		float vSq = 2*g*(spline.r(0).y-spline.r(tau).y);
-
-		if(vSq < 0){ kill(); return; }
-
+		if(!created || tau >= spline.maxTau()) return;
+		float g = -4.0f;
+		float vSq = 2*-g*(spline.r(0, false).y-spline.r(tau, false).y);
+		if(vSq < 0) return;
 		float v = std::sqrt(vSq);
-		float dtau = (v*dt)/length(spline.r(tau, 1));
-
-		if(tau+dtau >= spline.maxTau()){ kill(); return; }
-
+		float dtau = (v*dt)/length(spline.r(tau, true));
 		vec3 pos = spline.r(tau);
+		if(tau+dtau >= spline.maxTau()) return;
 		vec3 newpos = spline.r(tau+dtau);
 		vec3 delta = newpos-pos;
-		vec3 v0 = normalize(spline.r(tau, 1));
-		vec3 v1 = normalize(spline.r(tau+dtau, 1));
-
-		float drot = std::acos(dot(v0, v1));
- 		mat4 m = TranslateMatrix(-pos)*RotationMatrix(drot, {0, 0, 1})*TranslateMatrix(pos)*TranslateMatrix(delta);
+		mat4 m = TranslateMatrix(delta);
 		obj.transform(m);
 		
 		tau+=dtau;
+		vgrav=vgrav+g;
 
 	}
 };
@@ -265,7 +245,6 @@ Ball ball;
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	glPointSize(10);
-	glLineWidth(3);
 	spline.create();
 
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
@@ -273,7 +252,7 @@ void onInitialization() {
 // Window has become invalid: Redraw
 void onDisplay() {
 	glClearColor(0, 0, 0, 0);     // background color
- 	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
+	glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
 	// Set color to (0, 1, 0) = green
 	int location = glGetUniformLocation(gpuProgram.getId(), "color");
