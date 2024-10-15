@@ -142,7 +142,8 @@ public:
 		else { ts.push_back(ts.back() + 1); }
 		if(cpoints.size() >= 2) generateVertices();
 	}
-	vec3 r(float t, bool derivate) {
+	vec3 r(float t, bool derivate = false) {
+
 		for(int i = 0; i < cpoints.size(); i++) {
 			if(t >= ts[i] && t <= ts[i+1]) {				
 				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
@@ -181,19 +182,15 @@ class Ball {
 	Object obj;
 	vec3 centre;
 	float r;
-	vec3 vtot, vgrav;
 	float tau;
-	float dtau;
 	bool created = false;
 
 public:
 	void create() {
 		created = true;
 		tau = 0.01;
-		dtau = spline.getDTau();
 		vec3 pos = spline.r(tau, false);
-		vtot = vgrav = {0, 0, 0};
-		r = 0.075f;
+		r = 0.1f;
 		obj.create();
 		float nRot = 15;
 		vec4 v = { 0.0f, r, 1.0f, 1.0f};
@@ -217,15 +214,21 @@ public:
 		obj.draw(GL_TRIANGLE_FAN, { 0.0f, 0.0f, 1.0f });
 		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
 	}
-	void animate(float dt) {
+	void animate(float dt) {	
 		if(!created || tau >= spline.maxTau()) return;
-		vec3 g = {0, -4, 0};
-		vec3 T = spline.r(tau, true);
-		normalize(T);
-		mat4 f = TranslateMatrix(T/15);
-		obj.transform(f);
+		float g = -4.0f;
+		float vSq = 2*-g*(spline.r(0, false).y-spline.r(tau, false).y);
+		if(vSq < 0) return;
+		float v = std::sqrt(vSq);
+		float dtau = (v*dt)/length(spline.r(tau, true));
+		vec3 pos = spline.r(tau);
+		if(tau+dtau >= spline.maxTau()) return;
+		vec3 newpos = spline.r(tau+dtau);
+		vec3 delta = newpos-pos;
+		mat4 m = TranslateMatrix(delta);
+		obj.transform(m);
+		
 		tau+=dtau;
-		vgrav=vgrav+g;
 
 	}
 };
