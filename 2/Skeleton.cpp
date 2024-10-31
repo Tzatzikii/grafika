@@ -118,9 +118,9 @@ class CRSpline {
 		vec3 a1 = v0;
 		vec3 a2 = 3*(p1 - p0) - (v1 + 2*v0);
 		vec3 a3 = 2*(p0 - p1) + (v1 + v0);
-		if(derivate) ret = 3*a3*(t - t0)*(t - t0) + 2*a2*(t - t0) + a1;
-		else ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0);
-		ret.z = 1;
+		if(derivate){ ret = (3*a3*(t - t0)*(t - t0) + 2*a2*(t - t0) + a1); ret.z = 0; }
+		else { ret = (a3*(t - t0)*(t - t0)*(t - t0) + a2*(t - t0)*(t - t0) + a1*(t - t0) + a0); ret.z = 1; }
+		
 		return ret;
 		// vec3 a2 = 3*(p1 - p0)/std::pow((t1 - t0), 2) - (v0 + 2*v0)/(t1 - t0);
 		// vec3 a3 = 2*(p0 - p1)/std::pow((t1 - t0), 3) + (v1 + v0)/std::pow((t1 - t0), 2);
@@ -147,15 +147,15 @@ public:
 			if(t >= ts[i] && t <= ts[i+1]) {				
 				vec3 v0 = ((cpoints[i+1] - cpoints[i]) + (cpoints[i] - cpoints[i-1]))/2;				
 				vec3 v1 = ((cpoints[i+2] - cpoints[i+1]) + (cpoints[i+1] - cpoints[i]))/2;
-				v0.z = v1.z = 1;
+				v0.z = v1.z = 0;
 				if(i <= 1){
-					v0 = {0, 0, 1};
+					v0 = {0, 0, 0};
 				}
 				if(i >= cpoints.size() - 2){
-					v1 = {0, 0, 1};
+					v1 = {0, 0, 0};
 				}
-				hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t, derivate);
 				
+				return hermite(cpoints[i], cpoints[i+1], v0, v1, ts[i], ts[i+1], t, derivate);
 			}
 		}
 	}
@@ -165,7 +165,7 @@ public:
 		spline.clear();
 		float n = ts.back()/smoothness;
 		for(float t = 0; t <= ts.back(); t += n) {
-			spline.load(r(t));
+			spline.load(r(t, false));
 			
 		}
 	}
@@ -177,18 +177,18 @@ public:
 };
 
 CRSpline spline;
-
 class Ball {
 	Object obj;
 	vec3 centre;
 	float r;
-	vec3 v;
+	float tau;
 	bool created = false;
 
 public:
-	void create(vec3 pos) {
+	void create() {
 		created = true;
-		v = {0, 0, 1};
+		tau = 0.01;
+		vec3 pos = spline.r(0.01, false);
 		r = 0.075f;
 		obj.create();
 		float nRot = 15;
@@ -214,14 +214,11 @@ public:
 		obj.draw(GL_LINE_STRIP, { 1.0f, 1.0f, 1.0f });
 	}
 	void animate(float dt) {
-		static float tauTracker = 0.01;
-		vec3 g = {0, -4, 0};
-		float dtau = (length(g)/2)*dt*dt;
-		if(!created || tauTracker > spline.maxTau() ) return;
-		vec3 dx = spline.r(dtau, true);
-		mat4 f = TranslateMatrix(dx);
-		obj.transform(f);
-		tauTracker += dtau;
+		if(!created || tau >= spline.maxTau()) return;
+		vec3 g = { 0, -4, 0 };
+		vec3 v = spline.r(tau, true);
+		mat4 transform = TranslateMatrix(v);
+		obj.transform(transform);
 
 	}
 };
@@ -259,7 +256,7 @@ void onDisplay() {
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == ' ') ball.create(spline.r(0.01));         // if d, invalidate display, i.e. redraw
+	if (key == ' ') ball.create();         // if d, invalidate display, i.e. redraw
 }
 
 // Key of ASCII code released
