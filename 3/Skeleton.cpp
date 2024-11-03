@@ -50,6 +50,8 @@ const vec4 colors[] = {{1,1,1,1},{0,0,1,1},{0,1,0,1},{0,0,0,1}};
 
 const int MAP_WIDTH = 64;
 const int MAP_HEIGHT = 64;
+const float GLOBE_CIRCUMFERENCE = 40000;
+const float GLOBE_RADIUS = GLOBE_CIRCUMFERENCE / M_2_PI;
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330
@@ -180,9 +182,11 @@ class Slerp{
 		vec2 mEnd = mercatorInv(end);
 		vec3 euclStart = sphericalInv(mStart);
 		vec3 euclEnd = sphericalInv(mEnd);
-		float d = std::acos(dot(euclStart, euclEnd));
+		float theta = std::acos(dot(euclStart, euclEnd));
+		float dist = theta*GLOBE_RADIUS;
+		printf("Distance: %d km\n", (int)dist);
 		for(float t = 0; t <= 1; t+=1/sliceAmount){
-			vec3 slerpPoint = euclStart*((std::sin((1-t)*d))/(std::sin(d))) + euclEnd*((std::sin(t*d))/(std::sin(d)));
+			vec3 slerpPoint = euclStart*((std::sin((1-t)*theta))/(std::sin(theta))) + euclEnd*((std::sin(t*theta))/(std::sin(theta)));
 			slice.push_back(mercator(spherical(slerpPoint)));
 		}
 	}
@@ -263,7 +267,6 @@ void onMouse(int button, int state, int pX, int pY) {
 	float cX = 2.0f * pX / windowWidth - 1;	
 	float cY = 1.0f - 2.0f * pY / windowHeight;  
 	if(state == GLUT_DOWN && button == GLUT_LEFT){
-		printf("%f : %f\n", cX, cY);
 		slerp.addPoint(cX, cY);	
 		glutPostRedisplay();
 	}
