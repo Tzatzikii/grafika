@@ -18,8 +18,8 @@
 //
 // NYILATKOZAT
 // ---------------------------------------------------------------------------------------------
-// Nev    : 
-// Neptun : 
+// Nev    : Klemm Gabor Pal
+// Neptun : H8XK58
 // ---------------------------------------------------------------------------------------------
 // ezennel kijelentem, hogy a feladatot magam keszitettem, es ha barmilyen segitseget igenybe vettem vagy
 // mas szellemi termeket felhasznaltam, akkor a forrast es az atvett reszt kommentekben egyertelmuen jeloltem.
@@ -65,6 +65,7 @@ unsigned int vao;	   // virtual world on the GPU
 class Object {
 	unsigned int vao, vbo;
 	std::vector<vec3> vertices;
+	mat4 MVPtransf;
 
 public:
 	void create() {
@@ -74,6 +75,10 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+		MVPtransf = { 1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1 };
 	}
 
 	void load(vec3 v){
@@ -88,6 +93,9 @@ public:
 		updateGPU();
 	}
 
+	void setMVP(mat4 mat){ 
+		MVPtransf = mat;
+	}
 	void clear() {
 		vertices.clear();
 	}
@@ -99,8 +107,12 @@ public:
 	}
 
 	void draw(GLenum mode, vec3 color) {
-		updateGPU();
+		
 		gpuProgram.setUniform(color, "color");
+		u_int location = glGetUniformLocation(gpuProgram.getId(), "MVP");
+		glUniformMatrix4fv(location, 1, GL_TRUE, MVPtransf);
+		updateGPU();
+		
 		glDrawArrays(mode, 0, vertices.size());
 	}
 	
@@ -207,6 +219,14 @@ public:
 		mat4 t = TranslateMatrix(pos);
 		obj.transform(t);
 		obj.updateGPU();
+
+		vec3 dir = spline.r(tau, true);
+		dir = normalize(dir);
+		vec3 n = {-dir.y, dir.x};
+		pos.z = 0;
+		float objRot = std::acos(dot(n, {1, 0, 0})) - M_PI_2;
+		mat4 m = RotationMatrix(objRot, {0, 0, 1})*TranslateMatrix(pos);
+		obj.setMVP(m);
 	}
 
 	void draw() {

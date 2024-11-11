@@ -157,11 +157,15 @@ class Slerp{
 	const float sliceAmount = 100.0f;
 	const float rad85deg = 1.48353f;
 
+	float zScale(){
+		return std::log(std::tan(M_PI_4 + rad85deg/2));
+	}
+
 	vec2 mercatorInv(vec2 v){
-		return { v.x*M_PI, 2*(std::atan(std::exp(v.y*rad85deg))-M_PI_4) };
+		return { v.x*M_PI, 2*(std::atan(std::exp(v.y*zScale()))-M_PI_4) };
 	}
 	vec2 mercator(vec2 v){
-		return { v.x/M_PI, std::log(std::tan(M_PI_4 + (v.y)/2.0f))/rad85deg};
+		return { v.x/M_PI, std::log(std::tan(M_PI_4 + (v.y)/2.0f))/zScale()};
 	}
 	
 	//https://www.reddit.com/r/askmath/comments/ybbn3b/how_to_transform_latlong_coordinates_on_a_sphere/
