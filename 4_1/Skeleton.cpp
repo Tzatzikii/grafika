@@ -35,7 +35,10 @@
 
 inline float length(vec4 v){ return std::sqrt(dot(v,v)); }
 inline vec4 normalize(vec4 v){ return v/length(v); }
-
+inline vec3 vecPow(vec3 v, float pow){
+	return {std::pow(v.x, pow), std::pow(v.y, pow), std::pow(v.z, pow)};
+}
+inline vec3 operator/(vec3 v0, vec3 v1) { return vec3(v0.x/v1.x, v0.y/v1.y, v0.z/v1.z);}
 // vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
 const char * const vertexSource = R"(
 	#version 330
@@ -66,14 +69,25 @@ const int WINDOW_WIDTH = 600, WINDOW_HEIGHT = 600;
 const float EPSILON = 0.0001f;
 GPUProgram gpuProgram;
 struct Material {
-	vec3 ka, kd, ks;
+	enum types{
+		rough = 0,
+		reflective = 1,
+		refractive = 2
+	};
+	types type;
+	vec3 ka, kd, ks, kappa, nu;
 	float  shininess;
-	Material(vec3 _kd, vec3 _ks, float _shininess) : ka(_kd * M_PI), kd(_kd), ks(_ks) { shininess = _shininess; }
+	Material(vec3 _kd, vec3 _ks, float _shininess) : ka(_kd * 3), kd(_kd), ks(_ks), shininess(_shininess) {
+		type = rough; 
+	}
+	Material(vec3 _nu, vec3 _kappa, types _type) : nu(_nu), kappa(_kappa), type(_type){}
 };
 struct Ray{
 	vec3 start, dir;
 	bool out;
-	Ray(vec3 _start, vec3 _dir) : start(_start), dir(_dir){}
+	Ray(vec3 _start, vec3 _dir, bool _out = true) : start(_start), dir(_dir), out(_out){
+		dir = normalize(dir);
+	}
 };
 
 class Camera {
@@ -91,8 +105,8 @@ public:
 	}
 	
 	Ray getRay(int X, int Y) {
-		vec3 dir = lookat + right * (2.0f * (X + 0.5f) / windowWidth - 1) + up * (2.0f * (Y + 0.5f) / windowHeight - 1) - eye;
-		return Ray(eye, dir);
+		vec3 dir = lookat + right*(2.0f*(X + 0.5f)/windowWidth - 1) + up*(2.0f*(Y + 0.5f)/windowHeight - 1) - eye;
+		return Ray(eye, normalize(dir));
 	}
 	void rotate(float alpha){
 		vec4 v = {eye.x, eye.y, eye.z, 0};
@@ -128,6 +142,21 @@ public:
 	}
 	Hit intersect(const Ray& ray) {
 		Hit hit;
+		float a = dot(ray.dir, ray.dir)-dot(ray.dir, dir)*dot(ray.dir, dir);
+		float b = 2*dot(ray.start, ray.dir)-2*dot(base, ray.dir) - 2*dot(ray.start, dir)*dot(ray.dir, dir) + 2*dot(base, dir)*dot(ray.dir, dir);
+		float c = dot(ray.start - base, ray.start - base) - (dot(ray.start, dir)-dot(base, dir))*(dot(ray.start, dir)-dot(base, dir))  - r*r;
+		float discr = b*b - 4*a*c;
+		if(discr < 0) return hit;
+		else discr = std::sqrt(discr);
+		float t1 = (-b + discr)/(2*a), t2 = (-b - discr)/(2*a);
+		if(t1 <= 0) return hit;
+		hit.t = (t2 < t1) ? t2 : t1;
+		hit.pos = ray.start + ray.dir*hit.t;
+		if(!(dot((hit.pos - base), dir) >= 0 && dot((hit.pos - base), dir) <= h)) hit.t = -1;
+		hit.n = 2*(hit.pos - base) - 2*(dot((hit.pos - base), dir))* dir;
+		hit.n = normalize(hit.n);
+		hit.material = material;
+		return hit;
 	}
 };
 class Cone : public Intersectable{
@@ -153,6 +182,7 @@ public:
 		hit.pos = ray.start + ray.dir*hit.t;
 		if(!(dot((hit.pos - top), dir) >= 0 && dot((hit.pos - top), dir) <= h)) hit.t = -1;
 		hit.n = 2*(dot((hit.pos - top), dir))*dir - 2*(hit.pos - top)*std::cos(alpha)*std::cos(alpha);
+		hit.n = normalize(hit.n);
 		hit.material = material;
 		return hit;
 
@@ -162,9 +192,34 @@ public:
 	}
 };
 
+class Plane : public Intersectable{
+	float y;
+	int size, tileSize;
+	Material* xorTrue,* xorFalse;
+public:
+	Plane(float _y, int _size, int _tileSize, Material* _xorTrue, Material* _xorFalse) : y(_y), size(_size), tileSize(_tileSize), xorTrue(_xorTrue), xorFalse(_xorFalse){} 
+	Hit intersect(const Ray& ray){
+		Hit hit;
+		if(ray.dir.y == 0) return hit;
+		float t = (y - ray.start.y)/ray.dir.y;
+		if(t <= 0) return hit;
+		hit.t = t;
+		hit.pos = ray.start + ray.dir*hit.t;
+		if(std::abs(hit.pos.x) > size/2 || std::abs(hit.pos.z) > size/2) hit.t = -1;
+		if( ((int)floorf(hit.pos.x + size))%2 ^ ((int)floorf(hit.pos.z + size))%2 ) hit.material = xorTrue;
+		else hit.material = xorFalse;
+		hit.n = {0,1,0};
+		return hit;
+
+	}
+};
+
 struct Light{
-	vec3 color, dir;
-	Light(vec3 _color, float _intensity, vec3 _dir) : color(_color*_intensity), dir(_dir){};
+	vec3 Le, dir;
+	float in;
+	Light(vec3 _Le, vec3 _dir, float _in) : Le(_Le*_in), dir(_dir), in(_in){
+		dir = normalize(dir);
+	};
 };
 
 Camera camera({0,1,4}, {0,0,0}, {0,1,0}, M_PI_4);
@@ -172,14 +227,26 @@ Camera camera({0,1,4}, {0,0,0}, {0,1,0}, M_PI_4);
 class Scene{
 	std::vector<Intersectable*> objects;
 	std::vector<Light*> lights;
+	vec3 La;
 public:
 	vec4 image[WINDOW_WIDTH*WINDOW_HEIGHT];
 	Scene(){
+		La = {0.4f, 0.4f, 0.4f};
 		Material* material1 = new Material({0.1, 0.2, 0.3}, {2, 2, 2}, 100);
 		Material* material2 = new Material({0.3, 0, 0.2}, {2, 2, 2}, 20);
+		Material* mirrorGolden = new Material({0.17, 0.35, 1.5}, {3.1, 2.7, 1.9}, Material::reflective);
+		Material* water = new Material({1.3, 1.3, 1.3}, {0, 0, 0}, Material::refractive);
+		Material* plasticOrange = new Material({0.3, 0.2, 0.1}, {2, 2, 2}, 50);
+		Material* matteWhite = new Material({0.3f, 0.3f, 0.3f}, {0, 0, 0}, 0);
+		Material* matteBlue = new Material({0.0f, 0.1f, 0.3f}, {0, 0, 0}, 0);
 		objects.push_back(new Cone({0, 1, 0}, {-0.1, -1, -0.05}, 0.2, 2, material1));
 		objects.push_back(new Cone({0, 1, 0.8}, {0.2, -1, 0}, 0.2, 2, material2));
-		lights.push_back(new Light({1, 1, 1},1,{1,1,1}));
+		objects.push_back(new Plane(-1, 20, 1, matteBlue, matteWhite));
+		objects.push_back(new Cylinder({1, -1, 0}, {0.1,1,0}, 0.3, 2, mirrorGolden));
+		objects.push_back(new Cylinder({0, -1, -0.8}, {-0.2, 1, -0.1}, 0.3, 2, water));
+		objects.push_back(new Cylinder({-1, -1, 0}, {0, 1, 0.1}, 0.3, 2, plasticOrange));
+
+		lights.push_back(new Light({1,1,1},{1,1,1},2));
 
 	}
 	Hit firstIntersect(Ray ray) {
@@ -195,21 +262,64 @@ public:
 		for (Intersectable * object : objects) if (object->intersect(ray).t > 0) return true;
 		return false;
 	}
-	vec3 trace(Ray ray, int depth = 0){
-		Hit hit = firstIntersect(ray);
-		if(hit.t < 0) return {0,0,0};
-		vec3 outRadiance = hit.material->ka;
+	vec3 roughRad(Ray ray, Hit hit){
+		vec3 outRadiance = hit.material->ka * La;
 		for(Light* light : lights){
 			Ray shadowRay(hit.pos + hit.n*EPSILON, light->dir);
 			float cosTheta = dot(hit.n, light->dir);
 			if(cosTheta > 0 && !shadowIntersect(shadowRay)){
-				outRadiance = outRadiance + light->color * hit.material->kd * cosTheta;
+				outRadiance = outRadiance + light->Le * hit.material->kd * cosTheta;
 				vec3 halfway = normalize(-ray.dir + light->dir);
 				float cosDelta = dot(hit.n, halfway);
-				if(cosDelta > 0) outRadiance = outRadiance + light->color* hit.material->ks * std::pow(cosDelta, hit.material->shininess);
+				if(cosDelta > 0) {
+					outRadiance = outRadiance + light->Le*hit.material->ks*std::pow(cosDelta, hit.material->shininess);
+				}
+				
 			}
 		}
 		return outRadiance;
+	}
+	vec3 fresnel(vec3 dir, vec3 n, vec3 kappa, vec3 nu){
+		float cosAlpha = -dot(dir, n);
+		vec3 ones = {1, 1, 1};
+		vec3 F0 = ((nu-ones)*(nu-ones)+kappa*kappa)/
+			  ((nu+ones)*(nu+ones)+kappa*kappa);
+		return F0 + (ones - F0) * std::pow(1 - cosAlpha, 5);
+	}
+	vec3 reflect(vec3 dir, vec3 n){
+		return dir - n*dot(n, dir)*2;
+	}
+
+	vec3 refract(vec3 dir, vec3 n, float ns){
+		float cosAlpha = -dot(dir, n);
+		float disc = 1 - (1 - cosAlpha*cosAlpha)/ns/ns;
+		if(disc < 0) return vec3(0,0,0);
+		return dir/ns + n*(cosAlpha/ns - std::sqrt(disc));
+	}
+	vec3 reflectiveRad(Ray ray, Hit hit, vec3 outRadiance){
+		Ray reflected(hit.pos + hit.n*EPSILON, reflect(ray.dir, hit.n), ray.out);
+		outRadiance = outRadiance + trace(reflected)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+		return outRadiance;
+	}
+	vec3 refractiveRad(Ray ray, Hit hit, vec3 outRadiance){
+		float ior = ray.out ? hit.n.x : 1/hit.n.x;
+		vec3 refractedDir = refract(ray.dir, hit.n, ior);
+		if(length(refractedDir) > 0){
+			Ray refractedRay = {hit.pos - hit.n*EPSILON, refractedDir, !ray.out};
+			outRadiance = outRadiance + trace(refractedRay)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+		}
+		return outRadiance;
+	}
+	vec3 trace(Ray ray, int depth = 0){
+		Hit hit = firstIntersect(ray);
+		if(hit.t < 0) return La;
+		vec3 outRadiance = {0,0,0};
+		switch(hit.material->type){
+			case Material::rough: outRadiance = roughRad(ray, hit); break;
+			case Material::reflective: outRadiance = outRadiance + reflectiveRad(ray, hit, outRadiance); break;
+			case Material::refractive: outRadiance = outRadiance + refractiveRad(ray, hit, outRadiance); break;
+		}
+		return outRadiance;	
 	}
 	void render(){
 		for(int x = 0; x < WINDOW_WIDTH; x++){

@@ -106,7 +106,7 @@ public:
 		vec3 kd(0.3f, 0.2f, 0.1f), ks(2, 2, 2);
 		Material * material = new Material(kd, ks, 50);
 		for (int i = 0; i < 500; i++) 
-			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, material));
+			objects.push_back(new Sphere(vec3(rnd() - 0.5f, rnd() - 0.5f, rnd() - 0.5f), rnd() * 0.1f, new Material({0.3, 0, 0.2}, {2, 2, 2}, 20)));
 	}
 
 	void render(std::vector<vec4>& image) {
