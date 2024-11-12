@@ -65,7 +65,7 @@ const char * const fragmentSource = R"(
 		//outColor = vec4(1,1,1,1);
 	}
 )";
-const int WINDOW_WIDTH = 600, WINDOW_HEIGHT = 600;
+const int WINDOW_WIDTH = 300, WINDOW_HEIGHT = 300;
 const float EPSILON = 0.0001f;
 GPUProgram gpuProgram;
 struct Material {
@@ -91,30 +91,46 @@ struct Ray{
 };
 
 class Camera {
-	vec3 eye, lookat, right, up, vup;
-	float fov;
+	float rotation;
+	vec3 eye, lookat, right, up, vup, dir = {0, 0, -1};
+	float fov, screenw =2, screenh=2;
 	void build(){
-		vec3 w = eye - lookat;
-		float focus = length(w);
-		right = normalize(cross(vup, w)) * focus * tanf(fov / 2);
-		up = normalize(cross(w, right)) * focus * tanf(fov / 2);
+		vec3 w = dir;
+		right = normalize(cross(vup, w))*tanf(fov / 2);
+		up = normalize(cross(w, right))*tanf(fov / 2);
 	}
 public:
-	Camera(vec3 _eye, vec3 _lookat, vec3 _vup, float _fov) : eye(_eye), lookat(_lookat), vup(_vup), fov(_fov)  {
+	Camera(vec3 _eye, vec3 _lookat, vec3 _vup, float _fov) : eye(_eye), lookat(_lookat), vup(_vup), fov(_fov), rotation(0)  {
 		build();
 	}
 	
 	Ray getRay(int X, int Y) {
-		vec3 dir = lookat + right*(2.0f*(X + 0.5f)/windowWidth - 1) + up*(2.0f*(Y + 0.5f)/windowHeight - 1) - eye;
-		return Ray(eye, normalize(dir));
+		vec3 dir_ = dir*(screenw/2/tanf(fov/2)) + screenw*right*(2.0f*(X + 0.5f)/WINDOW_WIDTH - 1) + screenh*up*(2.0f*(Y + 0.5f)/WINDOW_HEIGHT - 1);
+		return Ray(eye, normalize(dir_));
 	}
-	void rotate(float alpha){
+	void rotateAroundZero(float alpha){
 		vec4 v = {eye.x, eye.y, eye.z, 0};
 
 		v=v*RotationMatrix(alpha, {0, 1, 0});
 		eye = {v.x, v.y, v.z};
 		build();
 	}
+	void go(float units){
+		vec4 v = {eye.x, eye.y, eye.z, 1};
+		mat4 t = TranslateMatrix(units*dir);
+		v = v*t;
+		eye = {v.x, v.y, v.z};
+		build();
+	}
+	void turn(float units){
+		vec4 v = {dir.x, dir.y, dir.z, 0};
+		v=v*RotationMatrix(units, {0,1,0});
+		dir = normalize(vec3(v.x, v.y, v.z));
+		build();
+		
+	}
+
+
 };
 
 
@@ -231,7 +247,7 @@ struct Light{
 	};
 };
 
-Camera camera({0,1,4}, {0,0,0}, {0,1,0}, M_PI_4);
+Camera camera({0,0,4}, {0,0,0}, {0,1,0}, 2);
 
 class Scene{
 	std::vector<Intersectable*> objects;
@@ -367,8 +383,8 @@ public:
 		glBindTexture(GL_TEXTURE_2D, textureId);
 
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_FLOAT, image);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	}
 	void draw(){
 		glBindVertexArray(vao);
@@ -381,7 +397,7 @@ public:
 };
 Screen screen;
 void onInitialization() {
-	glViewport(0, 0, windowWidth, windowHeight);
+	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 	scene.render();
 	screen.create();
 
@@ -398,7 +414,14 @@ void onDisplay() {
 }
 
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if(key == 'a') camera.rotate(M_PI_4);
+	switch(key){
+		case 'z':camera.rotateAroundZero(M_PI_4); break;
+		case 'w': camera.go(0.1); break;
+		case 's': camera.go(-0.1); break;
+		case 'd': camera.turn(0.05); break;
+		case 'a': camera.turn(-0.05); break;
+		default: break;
+	} 
 	scene.render();
 	screen.create();
 	glutPostRedisplay();
@@ -406,6 +429,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 
 // Key of ASCII code released
 void onKeyboardUp(unsigned char key, int pX, int pY) {
+	
 }
 
 // Move mouse with key pressed
@@ -415,8 +439,6 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 
 // Mouse click event
 void onMouse(int button, int state, int pX, int pY) {
-	float cX = 2.0f * pX / windowWidth - 1;	
-	float cY = 1.0f - 2.0f * pY / windowHeight;  
 }
 
 // Idle event indicating that some time elapsed: do animation here
