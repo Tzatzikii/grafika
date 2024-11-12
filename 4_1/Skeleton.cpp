@@ -151,10 +151,10 @@ public:
 		if(discr < 0) return hit;
 		else discr = std::sqrt(discr);
 		
-		float t1 = (-b + discr)/(2*a), t2 = (-b - discr)/(2*a);
-		if(t1 <= 0) return hit;
+		float t = (-b - discr)/(2*a);
+		if(t <= 0) return hit;
 
-		hit.t = (t2 > 0) ? t2 : t1;
+		hit.t = t; // = (t2 > 0) ? t2 : t1; // i mean !(t<=0) == t>0 so
 		hit.pos = ray.start + ray.dir*hit.t;
 
 		if(!(dot((hit.pos - base), dir) >= 0 && dot((hit.pos - base), dir) <= h)) hit.t = -1;
@@ -302,26 +302,25 @@ public:
 	vec3 refract(vec3 dir, vec3 n, float ns){
 		float cosAlpha = -dot(dir, n);
 		float disc = 1 - (1 - cosAlpha*cosAlpha)/(ns*ns);
-		if(disc < 0) return {0,0,0};
+		if(disc < 0) return reflect(dir, n);
 		return dir/ns + n*(cosAlpha/ns - std::sqrt(disc));
-		//return dir;
 	}
 
-	vec3 reflectiveRad(Ray ray, Hit hit, vec3 outRadiance){
+	vec3 reflectiveRad(Ray ray, Hit hit){
 		Ray reflected(hit.pos + hit.n*EPSILON, reflect(ray.dir, hit.n), ray.out);
-		outRadiance = outRadiance + trace(reflected)*(fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
-		return outRadiance;
+		return trace(reflected)*(fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+		
 	}
 
-	vec3 refractiveRad(Ray ray, Hit hit, vec3 outRadiance){
+	vec3 refractiveRad(Ray ray, Hit hit){
 		float ior = ray.out ? hit.n.x : 1/hit.n.x;
 		vec3 refractedDir = refract(ray.dir, hit.n, ior);
 		if(length(refractedDir) > 0){
 			Ray refractedRay = {hit.pos - hit.n*EPSILON, refractedDir, !ray.out};
-			outRadiance = outRadiance + trace(refractedRay)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
-			//outRadiance = {1,0,0};
+			return trace(refractedRay)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+			//outRadiance = {1,0,0}; // for debugging purposes
 		}
-		return outRadiance;
+		return {0,0,0};
 	}
 	vec3 trace(Ray ray, int depth = 0){
 		Hit hit = firstIntersect(ray);
@@ -329,8 +328,8 @@ public:
 		vec3 outRadiance = {0,0,0};
 		switch(hit.material->type){
 			case Material::rough: outRadiance = roughRad(ray, hit); break;
-			case Material::reflective: outRadiance = outRadiance + reflectiveRad(ray, hit, outRadiance); break;
-			case Material::refractive: outRadiance = outRadiance + refractiveRad(ray, hit, outRadiance); break;
+			case Material::reflective: outRadiance = outRadiance + reflectiveRad(ray, hit); break;
+			case Material::refractive: outRadiance = outRadiance + refractiveRad(ray, hit); break;
 		}
 		return outRadiance;	
 	}
