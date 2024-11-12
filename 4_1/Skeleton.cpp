@@ -85,7 +85,7 @@ struct Material {
 struct Ray{
 	vec3 start, dir;
 	bool out;
-	Ray(vec3 _start, vec3 _dir, bool _out = false) : start(_start), dir(_dir), out(_out){
+	Ray(vec3 _start, vec3 _dir, bool _out = true) : start(_start), dir(_dir), out(_out){
 		dir = normalize(dir);
 	}
 };
@@ -145,15 +145,21 @@ public:
 		float a = dot(ray.dir, ray.dir)-dot(ray.dir, dir)*dot(ray.dir, dir);
 		float b = 2*dot(ray.start, ray.dir)-2*dot(base, ray.dir) - 2*dot(ray.start, dir)*dot(ray.dir, dir) + 2*dot(base, dir)*dot(ray.dir, dir);
 		float c = dot(ray.start - base, ray.start - base) - (dot(ray.start, dir)-dot(base, dir))*(dot(ray.start, dir)-dot(base, dir))  - r*r;
+
 		float discr = b*b - 4*a*c;
+
 		if(discr < 0) return hit;
 		else discr = std::sqrt(discr);
+		
 		float t1 = (-b + discr)/(2*a), t2 = (-b - discr)/(2*a);
 		if(t1 <= 0) return hit;
-		hit.t = (t2 < t1) ? t2 : t1;
+
+		hit.t = (t2 > 0) ? t2 : t1;
 		hit.pos = ray.start + ray.dir*hit.t;
+
 		if(!(dot((hit.pos - base), dir) >= 0 && dot((hit.pos - base), dir) <= h)) hit.t = -1;
 		hit.n = 2*(hit.pos - base) - 2*(dot((hit.pos - base), dir))* dir;
+
 		hit.n = normalize(hit.n);
 		hit.material = material;
 		return hit;
@@ -173,12 +179,15 @@ public:
 		float a = dot(ray.dir, dir)*dot(ray.dir, dir) - dot(ray.dir, ray.dir)*std::cos(alpha)*std::cos(alpha);
 		float b = 2*dot(ray.dir, dir)*(dot(dir, ray.start)-dot(dir, top)) - 2*dot(ray.dir, ray.start - top)*std::cos(alpha)*std::cos(alpha);
 		float c = (dot(dir, ray.start)-dot(dir, top))*(dot(dir, ray.start)-dot(dir, top)) - dot(ray.start - top, ray.start - top)*std::cos(alpha)*std::cos(alpha);
+
 		float discr = b*b - 4*a*c;
 		if(discr < 0) return hit;
+
 		else discr = std::sqrt(discr);
-		float t1 = (-b + discr)/(2*a), t2 = (-b - discr)/(2*a);
-		if(t1 <= 0) return hit;
-		hit.t = (t2 < t1) ? t2 : t1;
+		float t = (-b + discr)/(2*a);
+
+		if(t <= 0) return hit;
+		hit.t = t;
 		hit.pos = ray.start + ray.dir*hit.t;
 		if(!(dot((hit.pos - top), dir) >= 0 && dot((hit.pos - top), dir) <= h)) hit.t = -1;
 		hit.n = 2*(dot((hit.pos - top), dir))*dir - 2*(hit.pos - top)*std::cos(alpha)*std::cos(alpha);
@@ -292,21 +301,25 @@ public:
 
 	vec3 refract(vec3 dir, vec3 n, float ns){
 		float cosAlpha = -dot(dir, n);
-		float disc = 1 - (1 - cosAlpha*cosAlpha)/ns/ns;
-		if(disc < 0) return vec3(0,0,0);
+		float disc = 1 - (1 - cosAlpha*cosAlpha)/(ns*ns);
+		if(disc < 0) return {0,0,0};
 		return dir/ns + n*(cosAlpha/ns - std::sqrt(disc));
+		//return dir;
 	}
+
 	vec3 reflectiveRad(Ray ray, Hit hit, vec3 outRadiance){
 		Ray reflected(hit.pos + hit.n*EPSILON, reflect(ray.dir, hit.n), ray.out);
 		outRadiance = outRadiance + trace(reflected)*(fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
 		return outRadiance;
 	}
+
 	vec3 refractiveRad(Ray ray, Hit hit, vec3 outRadiance){
 		float ior = ray.out ? hit.n.x : 1/hit.n.x;
 		vec3 refractedDir = refract(ray.dir, hit.n, ior);
 		if(length(refractedDir) > 0){
 			Ray refractedRay = {hit.pos - hit.n*EPSILON, refractedDir, !ray.out};
 			outRadiance = outRadiance + trace(refractedRay)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+			//outRadiance = {1,0,0};
 		}
 		return outRadiance;
 	}
