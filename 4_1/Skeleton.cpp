@@ -85,7 +85,7 @@ struct Material {
 struct Ray{
 	vec3 start, dir;
 	bool out;
-	Ray(vec3 _start, vec3 _dir, bool _out = true) : start(_start), dir(_dir), out(_out){
+	Ray(vec3 _start, vec3 _dir, bool _out = false) : start(_start), dir(_dir), out(_out){
 		dir = normalize(dir);
 	}
 };
@@ -123,7 +123,7 @@ struct Hit{
 	vec3 pos;
 	vec3 n;
 	Material* material;
-	Hit() { t = -1; }
+	Hit() { t = -1; n = normalize(n); }
 };
 struct Intersectable{
 	Material* material;
@@ -242,8 +242,8 @@ public:
 		objects.push_back(new Cone({0, 1, 0}, {-0.1, -1, -0.05}, 0.2, 2, material1));
 		objects.push_back(new Cone({0, 1, 0.8}, {0.2, -1, 0}, 0.2, 2, material2));
 		objects.push_back(new Plane(-1, 20, 1, matteBlue, matteWhite));
-		objects.push_back(new Cylinder({1, -1, 0}, {0.1,1,0}, 0.3, 2, mirrorGolden));
 		objects.push_back(new Cylinder({0, -1, -0.8}, {-0.2, 1, -0.1}, 0.3, 2, water));
+		objects.push_back(new Cylinder({1, -1, 0}, {0.1,1,0}, 0.3, 2, mirrorGolden));
 		objects.push_back(new Cylinder({-1, -1, 0}, {0, 1, 0.1}, 0.3, 2, plasticOrange));
 
 		lights.push_back(new Light({1,1,1},{1,1,1},2));
@@ -298,7 +298,7 @@ public:
 	}
 	vec3 reflectiveRad(Ray ray, Hit hit, vec3 outRadiance){
 		Ray reflected(hit.pos + hit.n*EPSILON, reflect(ray.dir, hit.n), ray.out);
-		outRadiance = outRadiance + trace(reflected)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
+		outRadiance = outRadiance + trace(reflected)*(fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
 		return outRadiance;
 	}
 	vec3 refractiveRad(Ray ray, Hit hit, vec3 outRadiance){
