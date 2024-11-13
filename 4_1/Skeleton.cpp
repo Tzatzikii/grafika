@@ -151,16 +151,15 @@ public:
 		if(discr < 0) return hit;
 		else discr = std::sqrt(discr);
 		
-		float t = (-b - discr)/(2*a);
-		if(t <= 0) return hit;
-
-		hit.t = t; // = (t2 > 0) ? t2 : t1; // i mean !(t<=0) == t>0 so
+		float t1 = (-b - discr)/a/2, t2 = (-b + discr)/a/2;
+		if(t1 <= 0) hit.t = t2;
+		else hit.t = t1;
 		hit.pos = ray.start + ray.dir*hit.t;
 
 		if(!(dot((hit.pos - base), dir) >= 0 && dot((hit.pos - base), dir) <= h)) hit.t = -1;
 		hit.n = 2*(hit.pos - base) - 2*(dot((hit.pos - base), dir))* dir;
 
-		hit.n = normalize(hit.n);
+		hit.n = ray.out ? normalize(hit.n) : -normalize(hit.n);
 		hit.material = material;
 		return hit;
 	}
