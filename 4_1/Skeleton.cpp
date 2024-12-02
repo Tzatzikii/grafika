@@ -152,14 +152,14 @@ public:
 		else discr = std::sqrt(discr);
 		
 		float t1 = (-b - discr)/a/2, t2 = (-b + discr)/a/2;
-		if(t1 <= 0) hit.t = t2;
-		else hit.t = t1;
+		if(t2 <= 0) return hit;
+		hit.t = t1 > 0 ? t1 : t2;
 		hit.pos = ray.start + ray.dir*hit.t;
 
 		if(!(dot((hit.pos - base), dir) >= 0 && dot((hit.pos - base), dir) <= h)) hit.t = -1;
-		hit.n = 2*(hit.pos - base) - 2*(dot((hit.pos - base), dir))* dir;
+		hit.n = hit.pos-base-dir*(dot((hit.pos-base), dir));
 
-		hit.n = ray.out ? normalize(hit.n) : -normalize(hit.n);
+		hit.n = normalize(hit.n);
 		hit.material = material;
 		return hit;
 	}
@@ -301,7 +301,7 @@ public:
 	vec3 refract(vec3 dir, vec3 n, float ns){
 		float cosAlpha = -dot(dir, n);
 		float disc = 1 - (1 - cosAlpha*cosAlpha)/(ns*ns);
-		if(disc < 0) return reflect(dir, n);
+		if(disc < 0) return {0,0,0};
 		return dir/ns + n*(cosAlpha/ns - std::sqrt(disc));
 	}
 
@@ -312,12 +312,11 @@ public:
 	}
 
 	vec3 refractiveRad(Ray ray, Hit hit){
-		float ior = ray.out ? hit.n.x : 1/hit.n.x;
+		float ior = ray.out ? hit.material->nu.x : 1/hit.material->nu.x;
 		vec3 refractedDir = refract(ray.dir, hit.n, ior);
 		if(length(refractedDir) > 0){
 			Ray refractedRay = {hit.pos - hit.n*EPSILON, refractedDir, !ray.out};
 			return trace(refractedRay)*(vec3(1,1,1) - fresnel(ray.dir, hit.n, hit.material->kappa, hit.material->nu));
-			//outRadiance = {1,0,0}; // for debugging purposes
 		}
 		return {0,0,0};
 	}
