@@ -87,8 +87,8 @@ void onDisplay() {
 	float color[] = {0,1,0};
 	int location = glGetUniformLocation(gpuProgram.getId(), "color");
 	glUniform3f(location, 0.0f, 1.0f, 0.0f);
-	location = glGetUniformLocation(gpuProgram.getId(), "MVP");
 	float matrix[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+	location = glGetUniformLocation(gpuProgram.getId(), "MVP");
 	glUniformMatrix4fv(location, 1, GL_TRUE, matrix);
 
 	glBindVertexArray(vao);

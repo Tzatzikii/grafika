@@ -2,26 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Thing",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/main",
-      "cwd": ".",
-      "linux": {
-        "MIMode": "gdb",
-        "miDebuggerPath": "/usr/bin/gdb"
-      },
-      "preLaunchTask": "compile"
-    },
-    {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",
       "args": [],
       "stopAtEntry": false,
       "externalConsole": false,
-      "cwd": "/home/kullancs/Documents/Programming/C++/Grafika/4",
-      "program": "/home/kullancs/Documents/Programming/C++/Grafika/4/build/Debug/outDebug",
+      "cwd": "/home/kullancs/Documents/Programming/C++/Grafika/1",
+      "program": "/home/kullancs/Documents/Programming/C++/Grafika/1/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
