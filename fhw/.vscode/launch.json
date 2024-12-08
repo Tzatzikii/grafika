@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Thing",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/main",
+      "cwd": ".",
+      "linux": {
+        "MIMode": "gdb",
+        "miDebuggerPath": "/usr/bin/gdb"
+      },
+      "preLaunchTask": "compile"
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "cwd": "/home/kullancs/Documents/Programming/C++/Grafika/5",
+      "program": "/home/kullancs/Documents/Programming/C++/Grafika/5/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

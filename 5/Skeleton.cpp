@@ -1,19 +1,42 @@
 //=============================================================================================
-// Computer Graphics Sample Program: 3D engine-let
-// Shader: Gouraud, Phong, NPR
-// Material: diffuse + Phong-Blinn
-// Texture: CPU-procedural
-// Geometry: sphere, tractricoid, torus, mobius, klein-bottle, boy, dini
-// Camera: perspective
-// Light: point or directional sources
+// Mintaprogram: Zďż˝ld hďż˝romszďż˝g. Ervenyes 2019. osztol.
+//
+// A beadott program csak ebben a fajlban lehet, a fajl 1 byte-os ASCII karaktereket tartalmazhat, BOM kihuzando.
+// Tilos:
+// - mast "beincludolni", illetve mas konyvtarat hasznalni
+// - faljmuveleteket vegezni a printf-et kiveve
+// - Mashonnan atvett programresszleteket forrasmegjeloles nelkul felhasznalni es
+// - felesleges programsorokat a beadott programban hagyni!!!!!!! 
+// - felesleges kommenteket a beadott programba irni a forrasmegjelolest kommentjeit kiveve
+// ---------------------------------------------------------------------------------------------
+// A feladatot ANSI C++ nyelvu forditoprogrammal ellenorizzuk, a Visual Studio-hoz kepesti elteresekrol
+// es a leggyakoribb hibakrol (pl. ideiglenes objektumot nem lehet referencia tipusnak ertekul adni)
+// a hazibeado portal ad egy osszefoglalot.
+// ---------------------------------------------------------------------------------------------
+// A feladatmegoldasokban csak olyan OpenGL fuggvenyek hasznalhatok, amelyek az oran a feladatkiadasig elhangzottak 
+// A keretben nem szereplo GLUT fuggvenyek tiltottak.
+//
+// NYILATKOZAT
+// ---------------------------------------------------------------------------------------------
+// Nev    : Gabor Klemm
+// Neptun : H8XK58
+// ---------------------------------------------------------------------------------------------
+// ezennel kijelentem, hogy a feladatot magam keszitettem, es ha barmilyen segitseget igenybe vettem vagy
+// mas szellemi termeket felhasznaltam, akkor a forrast es az atvett reszt kommentekben egyertelmuen jeloltem.
+// A forrasmegjeloles kotelme vonatkozik az eloadas foliakat es a targy oktatoi, illetve a
+// grafhazi doktor tanacsait kiveve barmilyen csatornan (szoban, irasban, Interneten, stb.) erkezo minden egyeb
+// informaciora (keplet, program, algoritmus, stb.). Kijelentem, hogy a forrasmegjelolessel atvett reszeket is ertem,
+// azok helyessegere matematikai bizonyitast tudok adni. Tisztaban vagyok azzal, hogy az atvett reszek nem szamitanak
+// a sajat kontribucioba, igy a feladat elfogadasarol a tobbi resz mennyisege es minosege alapjan szuletik dontes.
+// Tudomasul veszem, hogy a forrasmegjeloles kotelmenek megsertese eseten a hazifeladatra adhato pontokat
+// negativ elojellel szamoljak el es ezzel parhuzamosan eljaras is indul velem szemben.
 //=============================================================================================
 #include "framework.h"
 
+template<class T> struct Dnum {
 //---------------------------
-template<class T> struct Dnum { // Dual numbers for automatic derivation
-//---------------------------
-	float f; // function value
-	T d;  // derivatives
+	float f;
+	T d; 
 	Dnum(float f0 = 0, T d0 = T(0)) { f = f0, d = d0; }
 	Dnum operator+(Dnum r) { return Dnum(f + r.f, d + r.d); }
 	Dnum operator-(Dnum r) { return Dnum(f - r.f, d - r.d); }
@@ -42,11 +65,9 @@ typedef Dnum<vec2> Dnum2;
 
 const int tessellationLevel = 6;
 
-//---------------------------
-struct Camera { // 3D camera
-//---------------------------
-	vec3 wEye, wLookat, wVup, wDir;   // extrinsic
-	float fov, asp, fp, bp;		// intrinsic
+struct Camera { 
+	vec3 wEye, wLookat, wVup, wDir;
+	float fov, asp, fp, bp;	
 public:
 	Camera() {
 		make();
@@ -88,29 +109,23 @@ public:
 	}
 };
 
-//---------------------------
 struct Material {
-//---------------------------
 	vec3 kd, ks, ka;
 	float shininess;
 };
 
-//---------------------------
 struct Light {
-//---------------------------
 	vec3 La, Le;
-	vec4 wLightPos; // homogeneous coordinates, can be at ideal point
+	vec4 wLightPos;
 };
 struct Triangle{
-		vec3 r1, r2, r3;
+	vec4 r1, r2, r3;
 };
 
 struct VertexData {
-		vec3 position, normal;
-	};
-//---------------------------
+	vec3 position, normal;
+};
 class CheckerBoardTexture : public Texture {
-//---------------------------
 public:
 	CheckerBoardTexture(const int width, const int height) : Texture() {
 		std::vector<vec4> image(width * height);
@@ -123,10 +138,7 @@ public:
 		create(width, height, image, GL_NEAREST);
 	}
 };
-
-//---------------------------
 struct RenderState {
-//---------------------------
 	mat4	           MVP, M, Minv, V, P;
 	Material *         material;
 	std::vector<Light> lights;
@@ -135,16 +147,13 @@ struct RenderState {
 	vec3	           wEye;
 };
 
-//---------------------------
 class Shader : public GPUProgram {
-//---------------------------
 public:
 	virtual void Bind(RenderState state) = 0;
 
 	void setUniformMaterial(const Material& material, const std::string& name) {
 		setUniform(material.kd, name + ".kd");
 		setUniform(material.ks, name + ".ks");
-		//setUniform(material.ka, name + ".ka");
 		setUniform(material.shininess, name + ".shininess");
 	}
 
@@ -161,9 +170,7 @@ public:
 };
 
 
-//---------------------------
 class PhongShader : public Shader {
-//---------------------------
 	const char * vertexSource = R"(
 		#version 330
 		precision highp float;
@@ -196,7 +203,7 @@ class PhongShader : public Shader {
 				wLight[i] = lights[i].wLightPos.xyz; /* wPos.w - wPos.xyz * lights[i].wLightPos.w; */
 			}
 
-		    wView  = wEye * wPos.w - wPos.xyz;
+		    wView  = wEye - wPos.xyz;
 		    wNormal = (Minv * vec4(vtxNorm, 0)).xyz;
 		    texcoord.x = (vtxPos.x+1)/2;
 		    texcoord.y = (vtxPos.z+1)/2;
@@ -219,14 +226,14 @@ class PhongShader : public Shader {
 		};
 
 		struct Triangle {
-			vec3 r1, r2, r3;
+			vec4 r1, r2, r3;
 		};
 		uniform mat4 M, Minv;
 		uniform Material material;
 		uniform Light[8] lights;    // light sources 
 		uniform int   nLights;
 		uniform sampler2D paneTexture;
-		uniform int pane;
+		uniform bool pane;
 
 		uniform Triangle[60] triangles; //5*12 triangle
 
@@ -236,47 +243,42 @@ class PhongShader : public Shader {
 		in vec2 texcoord;
 		in vec4 wPos;
 		
-		int shadowIntersect(vec3 start, vec3 dir){
+		int triangleHit(vec3 start, vec3 dir){
+		int hitCount = 0;
 			for(int i = 0; i < 60; i++){
-				vec3 r1 = (vec4(triangles[i].r1, 1)* M).xyz;
-				vec3 r2 = (vec4(triangles[i].r2, 1) * M).xyz;
-				vec3 r3 = (vec4(triangles[i].r3, 1) * M).xyz;
+				vec3 r1 = triangles[i].r1.xyz;
+				vec3 r2 = triangles[i].r2.xyz;
+				vec3 r3 = triangles[i].r3.xyz;
 				vec3 n = cross(r2 - r1, r3 - r1);
 				float t = dot(r1 - start, n)/dot(dir, n);
-				if(t < 0) return 0;
+				if(t < 0) continue;
 				vec3 p = start + dir*t;
 				if(	dot(cross(r2 - r1, p - r1), n) > 0 &&
 					dot(cross(r3 - r2, p - r2), n) > 0 &&
-					dot(cross(r1 - r3, p - r3), n) > 0) return 1;
+					dot(cross(r1 - r3, p - r3), n) > 0
+				) hitCount++;
 			}
-			return 0;
+			return hitCount;
 		}
         	out vec4 fragmentColor; // output goes to frame buffer
 		void main() {
-			const float EPSILON = 0.0001f;
+			const float epsilon = 0.0000001f;
 			vec3 N = normalize(wNormal);
 			vec3 V = normalize(wView); 
 			if (dot(N, V) < 0) N = -N;	// prepare for one-sided surfaces like Mobius or Klein
 			vec3 ka = material.kd * 3;
 			vec3 kd = material.kd;
-			vec3 texColor = pane > 0 ? texture(paneTexture, texcoord).rgb : vec3(1, 1, 1);
-			vec3 radiance = vec3(0, 0, 0);
+			vec3 radiance = pane ? texture(paneTexture, texcoord).xyz*1.2 : vec3(0, 0, 0);
 			for(int i = 0; i < nLights; i++) {
 				vec3 L = normalize(wLight[i]);
 				vec3 H = normalize(L + V);
-				float cost = dot(N,L);
-				radiance += ka * lights[i].La ;
-				if(cost > 0 &&  shadowIntersect(wPos.xyz + N*EPSILON, -L) < 1 ){
+				float cost = max(dot(N,L), 0);
+				if(!pane) radiance += ka * lights[i].La;
+				if(!(triangleHit(wPos.xyz + N*epsilon, L) > 1 || (pane && triangleHit(wPos.xyz, L) > 0)  )){
 					float cosd = max(dot(N,H), 0);
-					// kd and ka are modulated by the texture
-					if(pane > 0){
-						radiance += texColor;
-					}
-					else radiance += (kd * texColor * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
+					if(pane) radiance *= 2;
+					else radiance += (kd * cost + material.ks * pow(cosd, material.shininess)) * lights[i].Le;
 				}
-			}
-			if(pane > 0){
-				radiance = texColor*2.5;
 			}
 			fragmentColor = vec4(radiance, 1);
 		}
@@ -292,10 +294,10 @@ public:
 		setUniform(state.wEye, "wEye");
 		setUniformMaterial(*state.material, "material");
 		if(state.texture != nullptr){
-			setUniform(1, "pane");
+			setUniform(true, "pane");
 		}
 		else{
-			setUniform(0, "pane");
+			setUniform(false, "pane");
 		}
 		setUniform((int)state.lights.size(), "nLights");
 		for (unsigned int i = 0; i < state.lights.size(); i++) {
@@ -307,9 +309,7 @@ public:
 	}
 };
 
-//---------------------------
 class Geometry {
-//---------------------------
 protected:
 	unsigned int vao, vbo;        // vertex array object
 public:
@@ -357,12 +357,8 @@ public:
 	}
 };
 inline vec4 vec3to4(vec3 v, float w){ return vec4(v.x, v.y, v.z, w); }
-//---------------------------
+
 class ParamSurface : public Geometry {
-//---------------------------
-	
-	
-	
 	unsigned int nVtxPerStrip, nStrips, nTriangles;
 	bool pane = false;
 public:
@@ -395,8 +391,11 @@ public:
 			}
 		}
 		for(int i = 1; i < nVtxPerStrip * nStrips - 1; i++){
-			triangles.push_back({vtxData[i-1].position, vtxData[i].position,
-						vtxData[i+1].position});
+			vec4 r1(vtxData[i-1].position.x, vtxData[i-1].position.y, vtxData[i-1].position.z, 1);
+			vec4 r2(vtxData[i].position.x, vtxData[i].position.y, vtxData[i].position.z, 1);
+			vec4 r3(vtxData[i+1].position.x, vtxData[i+1].position.y, vtxData[i+1].position.z, 1);
+
+			triangles.push_back( { r1, r2, r3 });
 		}
 		glBufferData(GL_ARRAY_BUFFER, nVtxPerStrip * nStrips * sizeof(VertexData), &vtxData[0], GL_STATIC_DRAW);
 		// Enable the vertex attribute arrays
@@ -415,9 +414,7 @@ public:
 
 
 
-//---------------------------
 class Cylinder : public ParamSurface {
-//---------------------------
 public:
 	Cylinder() { create(); }
 	void eval(Dnum2& U, Dnum2& V, Dnum2& X, Dnum2& Y, Dnum2& Z) {
@@ -441,9 +438,7 @@ public:
 };
 
 
-//---------------------------
 struct Object {
-//---------------------------
 	Shader *   shader;
 	Material * material;
 	Geometry * geometry;
@@ -461,11 +456,15 @@ public:
 		M = ScaleMatrix(scale) * RotationMatrix(rotationAngle, rotationAxis) * TranslateMatrix(translation);
 		Minv = TranslateMatrix(-translation) * RotationMatrix(-rotationAngle, rotationAxis) * ScaleMatrix(vec3(1 / scale.x, 1 / scale.y, 1 / scale.z));
 	}
+	mat4 M(){
+		return ScaleMatrix(scale) * RotationMatrix(rotationAngle, rotationAxis) * TranslateMatrix(translation);
 
+	}
 	void Draw(RenderState state) {
 		
 		mat4 M, Minv;
 		SetModelingTransform(M, Minv);
+		
 		state.M = M;
 		state.Minv = Minv;
 		state.MVP = state.M * state.V * state.P;
@@ -477,19 +476,16 @@ public:
 	virtual void Animate(float tstart, float tend) { rotationAngle = 0.8f * tend; }
 };
 
-Camera camera; // 3D camera
-//---------------------------
+Camera camera;
 class Scene {
-//---------------------------
 	std::vector<Object *> objects;
 	std::vector<Light> lights;\
 	Shader * phongShader;
+	RenderState state;
 public:
 	void Build() {
-		// Shaders
 		phongShader = new PhongShader();;
 
-		// Materials
 		Material * cyan = new Material;
 		cyan->kd = vec3(0.1, 0.2, 0.3);
 		cyan->ks = vec3(2, 2, 2);
@@ -555,32 +551,36 @@ public:
 		waterCylinder->rotationAxis = normalize(cross({0, 1, 0}, wDir));
 		objects.push_back(waterCylinder);
 
-
-		// Camera
 		camera.wEye = vec3(0, 1, 4);
-		camera.wLookat = vec3(0, 1, 0);
+		camera.wLookat = vec3(0, 0, 0);
 		camera.wVup = vec3(0, 1, 0);
 		
 		camera.wDir = camera.wLookat - camera.wEye;;
 
-		// Lights
 		Light light;
-		light.wLightPos = vec4(1, 1, 1, 0);	// ideal point -> directional light source
+		light.wLightPos = vec4(1, 1, 1, 0);
 		light.La = vec3(0.4f, 0.4f, 0.4f);
 		light.Le = vec3(2, 2, 2);
 		lights.push_back(light);
+
+		for(Object * obj : objects){
+			for(Triangle& triangle : obj->geometry->triangles){
+				triangle.r1 = triangle.r1 * obj->M();
+				triangle.r2 = triangle.r2 * obj->M();
+				triangle.r3 = triangle.r3 * obj->M();
+			}
+			state.triangles.insert(state.triangles.begin(), obj->geometry->triangles.begin(), obj->geometry->triangles.end());
+		}
 	}
 
 	void Render() {
-		RenderState state;
+		
 		state.wEye = camera.wEye;
 		state.V = camera.V();
 		state.P = camera.P();
 		state.lights = lights;
 		state.texture = nullptr;
-		for (Object * obj : objects){
-			state.triangles.insert(state.triangles.end(), obj->geometry->triangles.begin(), obj->geometry->triangles.end());
-		}
+		
 		for (Object * obj : objects){
 			obj->Draw(state);
 		}
@@ -601,7 +601,6 @@ public:
 
 Scene scene;
 
-// Initialization, create an OpenGL context
 bool keyDown[sizeof(char)];
 void onInitialization() {
 	for(bool& key : keyDown){
@@ -613,51 +612,57 @@ void onInitialization() {
 	scene.Build();
 }
 
-// Window has become invalid: Redraw
 void onDisplay() {
 	glClearColor(0.4f, 0.4f, 0.4f, 1.0f);							// background color 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the screen
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	scene.Render();
 	glutSwapBuffers();									// exchange the two buffers
 }
 
-// Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) { 
 	keyDown[key] = true;
+	if(key == 'a'){
+		camera.classicRotate(M_PI_4);
+		camera.make();
+		glutPostRedisplay();
+	}
 	
 }
-// Key of ASCII code released
+
 void onKeyboardUp(unsigned char key, int pX, int pY) { 
 	keyDown[key] = false;
 }
-// Mouse click event
+
 void onMouse(int button, int state, int pX, int pY) { }
 
-// Move mouse with key pressed
+
 void onMouseMotion(int pX, int pY) {
 }
 
-// Idle event indicating that some time elapsed: do animation here
 void onIdle() {
 	static float tend = 0;
-	const float dt = 0.1f; // dt is ”infinitesimal”
+	const float dt = 0.1f;
 	float tstart = tend;
 	tend = glutGet(GLUT_ELAPSED_TIME) / 1000.0f;
 
 	if(keyDown['w']){
 		camera.move(0.1);
+		glutPostRedisplay();
 	}
 	if(keyDown['s']){
 		camera.move(-0.1);
+		glutPostRedisplay();
 	}
-	if(keyDown['a']){
+	if(keyDown['j']){
 		camera.advancedRotate(0.05);
+		glutPostRedisplay();
 	}
-	if(keyDown['d']){
+	if(keyDown['k']){
 		camera.advancedRotate(-0.05);
+		glutPostRedisplay();
 	}
 	if(keyDown['r']){
 		camera.classicRotate(0.05);
+		glutPostRedisplay();
 	}
-	glutPostRedisplay();
 }
